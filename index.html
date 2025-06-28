@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitrage Pro | Enhanced Trading Platform</title>
+    <title>Arbitrage Pro | Dynamic Scanning Edition</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -353,21 +353,6 @@
             border: 1px solid var(--border);
         }
         
-        .combo-buttons-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 10px;
-        }
-        .combo-button {
-            background: linear-gradient(to right, #374151, #4B5563);
-            padding: 10px;
-            font-size: 0.9rem;
-        }
-        .combo-button:hover {
-            box-shadow: 0 5px 15px rgba(110, 231, 183, 0.2);
-            background: linear-gradient(to right, var(--primary), var(--primary-dark));
-        }
-        
         .status-badge {
             padding: 2px 8px;
             border-radius: 4px;
@@ -401,12 +386,7 @@
             color: var(--gray);
             font-size: 0.85rem;
         }
-        .address-info {
-            font-size: 0.9rem;
-            color: var(--secondary);
-            margin: 5px 0;
-            word-break: break-all;
-        }
+        
         .simulation-panel {
             background: rgba(31, 41, 55, 0.7);
             border-radius: 10px;
@@ -471,13 +451,7 @@
             background-color: rgba(239, 68, 68, 0.15);
             border-left: 4px solid var(--danger);
         }
-        .custom-path {
-            background: rgba(31, 41, 55, 0.7);
-            border-radius: 10px;
-            padding: 15px;
-            margin: 20px 0;
-            border: 1px solid var(--border);
-        }
+        
         .token-input-row {
             display: flex;
             align-items: center;
@@ -497,14 +471,7 @@
             padding: 10px;
             color: white;
         }
-        .custom-path-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-        .custom-path-btn {
-            flex: 1;
-        }
+        
         .flash-loan-control {
             display: flex;
             align-items: center;
@@ -524,45 +491,7 @@
             color: var(--gray);
             margin-top: 5px;
         }
-        .liquidity-check {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 5px 0;
-        }
-        .liquidity-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-        .liquidity-good {
-            background-color: var(--success);
-        }
-        .liquidity-warning {
-            background-color: var(--warning);
-        }
-        .liquidity-critical {
-            background-color: var(--danger);
-        }
-        .liquidity-status {
-            font-size: 0.9rem;
-            padding: 5px 10px;
-            border-radius: 4px;
-            margin-top: 5px;
-        }
-        .lq-good {
-            background-color: rgba(16, 185, 129, 0.15);
-            color: var(--success);
-        }
-        .lq-warning {
-            background-color: rgba(245, 158, 11, 0.15);
-            color: var(--warning);
-        }
-        .lq-critical {
-            background-color: rgba(239, 68, 68, 0.15);
-            color: var(--danger);
-        }
+        
         .reserve-row {
             display: flex;
             justify-content: space-between;
@@ -764,11 +693,6 @@
                 </div>
             </div>
 
-            <div class="section-title"><i class="fas fa-random"></i> Manual Scan Paths</div>
-            <div id="combinationButtons" class="combo-buttons-grid">
-                <!-- Buttons will be dynamically inserted here -->
-            </div>
-
             <div class="section-title"><i class="fas fa-history"></i> Backtesting Tool</div>
             <div class="simulation-panel">
                 <div class="simulation-title"><i class="fas fa-chart-bar"></i> Historical Data Analysis (Simulated)</div>
@@ -817,7 +741,7 @@
     </div>
 
     <div class="fixed-bottom">
-        <div class="version">Arbitrage Pro v3.3 | Calculation Fix</div>
+        <div class="version">Arbitrage Pro v3.4 | Dynamic Scanning</div>
     </div>
 
     <script>
@@ -858,19 +782,6 @@
             DOGE: { address: toChecksumAddress("0xba2ae424d960c26247dd6c32edc70b295c744c43"), decimals: 8, symbol: 'DOGE' },
         };
         
-        const COMBINATION_PATHS = [
-            { name: "WBNB→ETH→BTCB", path: [TOKENS.WBNB, TOKENS.ETH, TOKENS.BTCB, TOKENS.WBNB] },
-            { name: "WBNB→CAKE→BUSD", path: [TOKENS.WBNB, TOKENS.CAKE, TOKENS.BUSD, TOKENS.WBNB] },
-            { name: "WBNB→LINK→ETH", path: [TOKENS.WBNB, TOKENS.LINK, TOKENS.ETH, TOKENS.WBNB] },
-            { name: "WBNB→MATIC→CAKE", path: [TOKENS.WBNB, TOKENS.MATIC, TOKENS.CAKE, TOKENS.WBNB] },
-            { name: "WBNB→DOT→LINK", path: [TOKENS.WBNB, TOKENS.DOT, TOKENS.LINK, TOKENS.WBNB] },
-            { name: "WBNB→ADA→MATIC", path: [TOKENS.WBNB, TOKENS.ADA, TOKENS.MATIC, TOKENS.WBNB] },
-            { name: "WBNB→SHIB→DOGE", path: [TOKENS.WBNB, TOKENS.SHIB, TOKENS.DOGE, TOKENS.WBNB] },
-            { name: "WBNB→BTCB→USDT", path: [TOKENS.WBNB, TOKENS.BTCB, TOKENS.USDT, TOKENS.WBNB] },
-            { name: "WBNB→CAKE→LINK", path: [TOKENS.WBNB, TOKENS.CAKE, TOKENS.LINK, TOKENS.WBNB] },
-            { name: "WBNB→ETH→USDT", path: [TOKENS.WBNB, TOKENS.ETH, TOKENS.USDT, TOKENS.WBNB] },
-        ];
-        
         const FACTORY_ADDRESS = toChecksumAddress('0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73');
         const FACTORY_ABI = ['function getPair(address,address) external view returns (address)'];
         const DEX_ROUTERS = {
@@ -880,7 +791,6 @@
             BiSwap: "0x3a6d8cA21D1CF76F653A67577FA0D27453350dD8"
         };
 
-        // Global variables
         let provider, signer, contract, walletAddress, factory;
         let currentOpportunity = null;
         let isAutoScanning = false;
@@ -890,7 +800,10 @@
 
         function setupUI() {
             document.getElementById('connectWallet').addEventListener('click', connectWallet);
-            document.getElementById('scanAll').addEventListener('click', () => scanPaths(COMBINATION_PATHS));
+            document.getElementById('scanAll').addEventListener('click', () => {
+                const allCombinations = generateAllCombinations();
+                scanPaths(allCombinations);
+            });
             document.getElementById('executeTrade').addEventListener('click', executeTrade);
             document.getElementById('viewContract').addEventListener('click', viewContract);
             document.getElementById('autoScanToggle').addEventListener('click', toggleAutoScanner);
@@ -898,17 +811,6 @@
             document.getElementById('flashLoanInput').addEventListener('change', updateFlashLoanAmount);
             document.getElementById('runBacktest').addEventListener('click', runBacktest);
             document.getElementById('comparePrices').addEventListener('click', compareDexPrices);
-
-            const buttonsContainer = document.getElementById('combinationButtons');
-            buttonsContainer.innerHTML = '';
-            COMBINATION_PATHS.forEach((combo, index) => {
-                const button = document.createElement('button');
-                button.className = 'combo-button';
-                button.textContent = combo.name;
-                button.dataset.pathIndex = index;
-                button.addEventListener('click', () => scanPaths([COMBINATION_PATHS[index]]));
-                buttonsContainer.appendChild(button);
-            });
             
             const checksummedAddr = toChecksumAddress(RAW_CONTRACT_ADDRESS);
             const isValid = ethers.utils.isAddress(checksummedAddr);
@@ -939,16 +841,20 @@
             }
         }
         
-        async function toggleAutoScanner() {
+        function toggleAutoScanner() {
             const autoScanBtn = document.getElementById('autoScanToggle');
             isAutoScanning = !isAutoScanning;
 
             if (isAutoScanning) {
                 autoScanBtn.innerHTML = '<i class="fas fa-stop-circle"></i> Stop Auto-Scan';
                 autoScanBtn.classList.add('active-scan');
-                logMessage('Auto-scanner started. Scanning every 30 seconds...');
-                scanPaths(COMBINATION_PATHS);
-                autoScanInterval = setInterval(() => scanPaths(COMBINATION_PATHS), 30000);
+                const allCombinations = generateAllCombinations();
+                logMessage(`Auto-scanner started. Scanning ${allCombinations.length} paths every 30 seconds...`);
+                scanPaths(allCombinations);
+                autoScanInterval = setInterval(() => {
+                    const combinations = generateAllCombinations();
+                    scanPaths(combinations);
+                }, 30000);
                 document.getElementById('scanAll').disabled = true;
             } else {
                 autoScanBtn.innerHTML = '<i class="fas fa-robot"></i> Start Auto-Scan';
@@ -957,6 +863,28 @@
                 logMessage('Auto-scanner stopped.');
                 document.getElementById('scanAll').disabled = false;
             }
+        }
+
+        function generateAllCombinations() {
+            const allTokens = Object.values(TOKENS);
+            const baseToken = TOKENS.WBNB;
+            const otherTokens = allTokens.filter(t => t.address.toLowerCase() !== baseToken.address.toLowerCase());
+            const combinations = [];
+
+            for (let i = 0; i < otherTokens.length; i++) {
+                for (let j = 0; j < otherTokens.length; j++) {
+                    if (i === j) continue; // Skip A->A
+
+                    const tokenA = otherTokens[i];
+                    const tokenB = otherTokens[j];
+                    
+                    const path = [baseToken, tokenA, tokenB, baseToken];
+                    const name = `${baseToken.symbol}→${tokenA.symbol}→${tokenB.symbol}`;
+
+                    combinations.push({ name, path });
+                }
+            }
+            return combinations;
         }
 
         async function getPairInfo(tokenA, tokenB) {
@@ -986,7 +914,7 @@
         async function scanPaths(pathsToScan) {
             if (!signer) return logMessage("Please connect wallet first.", true);
 
-            logMessage(`Scanning ${pathsToScan.length} path(s) with ${FLASH_LOAN_AMOUNT} BNB...`);
+            logMessage(`Scanning ${pathsToScan.length} total possible paths with ${FLASH_LOAN_AMOUNT} BNB...`);
             if (!isAutoScanning) document.getElementById('scanAll').disabled = true;
             document.getElementById('executeTrade').disabled = true;
             
@@ -1006,7 +934,7 @@
                         const pairInfo = await getPairInfo(tokenIn.address, path[i+1].address);
                         
                         if (!pairInfo) {
-                            throw new Error(`No liquidity pool for ${tokenIn.symbol}/${path[i+1].symbol}`);
+                            throw new Error(`No pool for ${tokenIn.symbol}/${path[i+1].symbol}`);
                         }
 
                         const [reserveIn, reserveOut] = tokenIn.address.toLowerCase() === pairInfo.token0.toLowerCase()
@@ -1037,14 +965,17 @@
                         }
                     }
                 } catch(e) { 
-                    logMessage(`Skipping path ${pathSymbols.join("->")}: ${e.message}`, true); 
+                    // Do not log "No pool" errors to keep the log clean during a large scan
+                    if (!e.message.includes("No pool")) {
+                        logMessage(`Skipping path ${pathSymbols.join("->")}: ${e.message}`, true); 
+                    }
                 }
                 pathsChecked++;
                 updateProgress((pathsChecked / pathsToScan.length) * 100);
             }
             
             if (bestOpportunity.profit > MIN_PROFIT_THRESHOLD) {
-                logMessage(`SUCCESS: New best opportunity found! Profit: ${bestOpportunity.profit.toFixed(4)}%`, false);
+                logMessage(`SUCCESS: New best opportunity found! Path: ${bestOpportunity.pathSymbols.join('→')} Profit: ${bestOpportunity.profit.toFixed(4)}%`, false);
                 currentOpportunity = bestOpportunity;
                 document.getElementById('executeTrade').disabled = false;
             } else if (pathsToScan.length > 1) {
@@ -1084,7 +1015,6 @@
                 );
 
                 const gasLimit = estimatedGasLimit.mul(120).div(100); 
-                
                 const totalGasFee = gasPrice.mul(gasLimit);
                 const feeInBnb = ethers.utils.formatEther(totalGasFee);
 
@@ -1108,7 +1038,6 @@
                 document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-hourglass-half"></i> Tx Sent: <a href="https://bscscan.com/tx/${tx.hash}" target="_blank" class="tx-link">${tx.hash}</a></div>`;
                 
                 const receipt = await tx.wait();
-                
                 const actualFee = receipt.gasUsed.mul(receipt.effectiveGasPrice);
 
                 if (receipt.status === 1) {
@@ -1199,15 +1128,12 @@
             backtestResultsEl.innerHTML = '<div class="spinner" style="display:block; margin: 10px auto;"></div>';
             
             const timeRange = document.getElementById('backtestTimeRange').value;
-
             await new Promise(resolve => setTimeout(resolve, 1500));
-
             const simulatedResults = {
                 opportunitiesFound: Math.floor(Math.random() * 50) + 10,
                 avgProfit: (Math.random() * 5 + 2).toFixed(2),
                 successRate: (Math.random() * 30 + 70).toFixed(1),
             };
-
             backtestResultsEl.innerHTML = `
                 <div class="sim-success">
                     <div class="reserve-row"><span class="reserve-label">Opportunities Found:</span> <span class="reserve-value">${simulatedResults.opportunitiesFound}</span></div>
@@ -1226,7 +1152,6 @@
             dexComparisonEl.innerHTML = '<div class="spinner" style="display:block; margin: 10px auto;"></div>';
 
             await new Promise(resolve => setTimeout(resolve, 1500));
-
             const basePrice = 300 + (Math.random() * 50);
             let priceHTML = '';
             
