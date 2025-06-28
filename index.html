@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitrage Pro | High-Speed Scanning</title>
+    <title>Arbitrage Pro | Expanded Path Scanning</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -308,7 +308,8 @@
         .success { color: var(--success); }
         .error { color: var(--danger); }
         .info { color: var(--secondary); }
-        
+        .warning-text { color: var(--warning); }
+
         .opportunity-card {
             background: rgba(31, 41, 55, 0.7);
             border-radius: 10px;
@@ -742,7 +743,7 @@
     </div>
 
     <div class="fixed-bottom">
-        <div class="version">Arbitrage Pro v3.8 | Parallel Scanning Engine</div>
+        <div class="version">Arbitrage Pro v3.9 | Parallel Scanning Engine</div>
     </div>
 
     <script>
@@ -768,7 +769,11 @@
             BTCB: { address: toChecksumAddress("0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c"), decimals: 18, symbol: 'BTCB' },
             CAKE: { address: toChecksumAddress("0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82"), decimals: 18, symbol: 'CAKE' },
             LINK: { address: toChecksumAddress("0xf8a0bf9cf54bb92fb173938622107ae6a24aa565"), decimals: 18, symbol: 'LINK' },
-            DOT:  { address: toChecksumAddress("0x7083609fce4d1d8dc0c979aab8c869ea2c873402"), decimals: 18, symbol: 'DOT' }
+            DOT:  { address: toChecksumAddress("0x7083609fce4d1d8dc0c979aab8c869ea2c873402"), decimals: 18, symbol: 'DOT' },
+            XRP:  { address: toChecksumAddress("0x1d2f0da166d9222b81948da16d7999c348c14c8c"), decimals: 18, symbol: 'XRP'  },
+            LTC:  { address: toChecksumAddress("0x4338665cbb7b2485a8855a139b75d5e34ab0db94"), decimals: 18, symbol: 'LTC'  },
+            TRX:  { address: toChecksumAddress("0x85eac5ac2f758618dfa0926797919861b2714a51"), decimals: 18, symbol: 'TRX'  },
+            UNI:  { address: toChecksumAddress("0xbf5140a255dc56728e6024e4e8bf83238d23e387"), decimals: 18, symbol: 'UNI'  },
         };
         
         const DEXS = {
@@ -782,13 +787,14 @@
         let provider, signer, contract;
         let currentOpportunity = null;
         let isAutoScanning = false;
+        let isManualScanning = false;
 
         document.addEventListener('DOMContentLoaded', setupUI);
 
         function setupUI() {
             document.getElementById('connectWallet').addEventListener('click', connectWallet);
             document.getElementById('scanAll').addEventListener('click', () => {
-                const allPaths = generateCrossDexPaths();
+                const allPaths = generateAllPaths();
                 scanForOpportunities(allPaths);
             });
             document.getElementById('executeTrade').addEventListener('click', executeTrade);
@@ -805,14 +811,14 @@
             document.getElementById('checksumStatus').className = checksummedAddr ? 'success' : 'error';
         }
         
-        function stopAutoScan() {
+        function stopAutoScan(wasCancelledByUser) {
              isAutoScanning = false;
              const autoScanBtn = document.getElementById('autoScanToggle');
              const scanAllBtn = document.getElementById('scanAll');
-             scanAllBtn.disabled = false;
+             if(!isManualScanning) scanAllBtn.disabled = false;
              autoScanBtn.innerHTML = '<i class="fas fa-robot"></i> Start Auto-Scan';
              autoScanBtn.classList.remove('active-scan');
-             logMessage('Auto-scanner stopped.');
+             if(wasCancelledByUser) logMessage('Auto-scanner stopped.');
         }
 
         function toggleAutoScanner() {
@@ -827,19 +833,17 @@
                 logMessage('Auto-scanner started. Searching for first profitable opportunity...');
                 findFirstOpportunity();
             } else {
-                 isAutoScanning = false; // This will signal the loop to stop
-                 stopAutoScan();
+                 stopAutoScan(true); // true means user cancelled it
             }
         }
 
         async function findFirstOpportunity() {
             while (isAutoScanning) {
-                const allPaths = generateCrossDexPaths();
+                const allPaths = generateAllPaths();
                 const opportunity = await scanForOpportunities(allPaths, true);
                 if (opportunity) {
                     logMessage(`Opportunity found! Auto-scan stopped.`, false);
-                    isAutoScanning = false; // Ensure loop stops
-                    stopAutoScan();
+                    stopAutoScan(false); // false means it stopped itself
                     break;
                 }
                 if (isAutoScanning) {
@@ -849,13 +853,14 @@
             }
         }
 
-        function generateCrossDexPaths() {
+        function generateAllPaths() {
             const allTokens = Object.values(TOKENS);
             const baseToken = TOKENS.WBNB;
             const otherTokens = allTokens.filter(t => t.address.toLowerCase() !== baseToken.address.toLowerCase());
             const dexKeys = Object.keys(DEXS);
             const paths = [];
 
+            // 3-hop paths (WBNB -> A -> B -> WBNB)
             for (const tokenA of otherTokens) {
                 for (const tokenB of otherTokens) {
                     if (tokenA.address === tokenB.address) continue;
@@ -863,19 +868,42 @@
                         for (const dex2 of dexKeys) {
                             paths.push({
                                 tokenPath: [baseToken, tokenA, tokenB, baseToken],
-                                dexPath: [dex1, dex2],
+                                dexFactories: [DEXS[dex1].factory, DEXS[dex2].factory],
+                                dexRouters: [DEXS[dex1].router, DEXS[dex2].router],
                                 name: `${baseToken.symbol}→${tokenA.symbol}(${dex1})→${tokenB.symbol}(${dex2})`
                             });
                         }
                     }
                 }
             }
+
+            // 4-hop paths (WBNB -> A -> B -> C -> WBNB)
+            for (const tokenA of otherTokens) {
+                for (const tokenB of otherTokens) {
+                    if (tokenA.address === tokenB.address) continue;
+                    for (const tokenC of otherTokens) {
+                        if (tokenC.address === tokenA.address || tokenC.address === tokenB.address) continue;
+                        for (const dex1 of dexKeys) {
+                            for (const dex2 of dexKeys) {
+                                for (const dex3 of dexKeys) {
+                                    paths.push({
+                                        tokenPath: [baseToken, tokenA, tokenB, tokenC, baseToken],
+                                        dexFactories: [DEXS[dex1].factory, DEXS[dex2].factory, DEXS[dex3].factory],
+                                        dexRouters: [DEXS[dex1].router, DEXS[dex2].router, DEXS[dex3].router],
+                                        name: `${baseToken.symbol}→${tokenA.symbol}(${dex1})→${tokenB.symbol}(${dex2})→${tokenC.symbol}(${dex3})`
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             return paths;
         }
 
-        async function getAmountOutFromRouter(amountIn, path, dexName) {
+        async function getAmountOutFromRouter(amountIn, path, routerAddress) {
             try {
-                const routerAddress = DEXS[dexName].router;
                 const router = new ethers.Contract(routerAddress, ROUTER_ABI, provider);
                 const amounts = await router.getAmountsOut(amountIn, path.map(t => t.address));
                 return amounts[amounts.length - 1];
@@ -887,22 +915,28 @@
         async function scanForOpportunities(pathsToScan, stopOnFirst = false) {
             if (!signer) {
                  logMessage("Please connect wallet first.", true);
-                 stopAutoScan();
+                 stopAutoScan(false);
                  return null;
             }
-            
-            logMessage(`Scanning ${pathsToScan.length} total possible paths...`);
+
+            isManualScanning = !stopOnFirst;
+            logMessage(`Scanning ${pathsToScan.length} total possible paths... (This may take a while)`);
             if (!isAutoScanning) document.getElementById('scanAll').disabled = true;
             document.getElementById('executeTrade').disabled = true;
+            updateProgress(0);
 
             const checkPath = async (pathInfo) => {
                  try {
                     const amountIn = ethers.utils.parseUnits(FLASH_LOAN_AMOUNT.toString(), pathInfo.tokenPath[0].decimals);
-                    let amountOut1 = await getAmountOutFromRouter(amountIn, [pathInfo.tokenPath[0], pathInfo.tokenPath[1]], pathInfo.dexPath[0]);
-                    if (amountOut1.isZero() || !isAutoScanning && stopOnFirst) return null;
-                    let amountOut2 = await getAmountOutFromRouter(amountOut1, [pathInfo.tokenPath[1], pathInfo.tokenPath[2]], pathInfo.dexPath[1]);
-                    if (amountOut2.isZero() || !isAutoScanning && stopOnFirst) return null;
-                    let finalAmountOut = await getAmountOutFromRouter(amountOut2, [pathInfo.tokenPath[2], pathInfo.tokenPath[3]], 'PancakeSwap');
+                    let currentAmount = amountIn;
+
+                    for (let i = 0; i < pathInfo.dexRouters.length; i++) {
+                        const pathSegment = [pathInfo.tokenPath[i], pathInfo.tokenPath[i+1]];
+                        currentAmount = await getAmountOutFromRouter(currentAmount, pathSegment, pathInfo.dexRouters[i]);
+                        if (currentAmount.isZero()) return null;
+                    }
+                    
+                    const finalAmountOut = await getAmountOutFromRouter(currentAmount, [pathInfo.tokenPath[pathInfo.tokenPath.length - 2], pathInfo.tokenPath[pathInfo.tokenPath.length - 1]], DEXS.PancakeSwap.router);
                     if (finalAmountOut.isZero()) return null;
 
                     const slippageFactor = (100 - SLIPPAGE_TOLERANCE) / 100;
@@ -912,7 +946,7 @@
                     if (profit.gt(0)) {
                         const profitPercentage = (profit.mul(10000).div(amountIn)).toNumber() / 100;
                         if (profitPercentage > MIN_PROFIT_THRESHOLD) {
-                            return { profit: profitPercentage, path: pathInfo.tokenPath.map(p => p.address), dexes: [DEXS[pathInfo.dexPath[0]].factory, DEXS[pathInfo.dexPath[1]].factory], name: pathInfo.name, amountIn };
+                            return { profit: profitPercentage, path: pathInfo.tokenPath.map(p => p.address), dexes: pathInfo.dexFactories, name: pathInfo.name, amountIn };
                         }
                     }
                 } catch(e) { return null; }
@@ -920,21 +954,25 @@
             };
 
             let bestOpportunity = { profit: -Infinity };
+            let pathsChecked = 0;
             const chunkSize = 50; 
             for (let i = 0; i < pathsToScan.length; i += chunkSize) {
                 if (stopOnFirst && bestOpportunity.profit > MIN_PROFIT_THRESHOLD) break;
-                if (!isAutoScanning && document.getElementById('scanAll').disabled === false) break;
+                if(!isAutoScanning && !isManualScanning) break;
 
                 const chunk = pathsToScan.slice(i, i + chunkSize);
                 const promises = chunk.map(p => checkPath(p));
                 const results = await Promise.all(promises);
+
+                pathsChecked += chunk.length;
 
                 for (const opportunity of results) {
                     if (opportunity && opportunity.profit > bestOpportunity.profit) {
                         bestOpportunity = opportunity;
                     }
                 }
-                updateProgress(((i + chunkSize) / pathsToScan.length) * 100);
+                
+                if(!stopOnFirst) updateProgress((pathsChecked / pathsToScan.length) * 100);
             }
             
             if (bestOpportunity.profit > MIN_PROFIT_THRESHOLD) {
@@ -946,7 +984,10 @@
                 logMessage("Scan complete. No profitable opportunities found.", false, true);
             }
             
-            if (!isAutoScanning) document.getElementById('scanAll').disabled = false;
+            if (!isAutoScanning) {
+                document.getElementById('scanAll').disabled = false;
+                isManualScanning = false;
+            }
             return null;
         }
 
@@ -961,8 +1002,7 @@
                 const gasPrice = await provider.getGasPrice();
                 document.getElementById('gasPriceDisplay').textContent = `${parseFloat(ethers.utils.formatUnits(gasPrice, 'gwei')).toFixed(2)} Gwei`;
                 
-                const dexFactoriesForTx = [currentOpportunity.dexes[0], currentOpportunity.dexes[1]];
-                const estimatedGasLimit = await contract.estimateGas.executeArbitrage(currentOpportunity.path[0], currentOpportunity.amountIn, currentOpportunity.path, dexFactoriesForTx);
+                const estimatedGasLimit = await contract.estimateGas.executeArbitrage(currentOpportunity.path[0], currentOpportunity.amountIn, currentOpportunity.path, currentOpportunity.dexes);
                 const gasLimit = estimatedGasLimit.mul(120).div(100);
                 const totalGasFee = gasPrice.mul(gasLimit);
                 const feeInBnb = ethers.utils.formatEther(totalGasFee);
@@ -970,7 +1010,7 @@
                 logMessage(`Estimated network fee: ${feeInBnb} BNB. Please confirm in your wallet.`);
                 document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-fire"></i> Estimated Fee: <strong>${parseFloat(feeInBnb).toFixed(8)} BNB</strong></div><div class="execution-status status-pending" style="margin-top: 5px;"><i class="fas fa-wallet"></i> Waiting for wallet confirmation...</div>`;
 
-                const tx = await contract.executeArbitrage(currentOpportunity.path[0], currentOpportunity.amountIn, currentOpportunity.path, dexFactoriesForTx, { gasPrice, gasLimit });
+                const tx = await contract.executeArbitrage(currentOpportunity.path[0], currentOpportunity.amountIn, currentOpportunity.path, currentOpportunity.dexes, { gasPrice, gasLimit });
                 logMessage(`Transaction sent with hash: ${tx.hash}`);
                 document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-hourglass-half"></i> Tx Sent: <a href="https://bscscan.com/tx/${tx.hash}" target="_blank" class="tx-link">${tx.hash}</a></div>`;
                 
@@ -1024,7 +1064,7 @@
             const timestamp = new Date().toLocaleTimeString();
             let colorClass = 'info';
             if (isError) colorClass = 'error';
-            else if (isWarning) colorClass = 'warning-text'; // A different class for non-error warnings
+            else if (isWarning) colorClass = 'warning-text';
             resultDiv.innerHTML = `<div style="margin-bottom: 5px;">[${timestamp}] <span class="${colorClass}">${message}</span></div>` + resultDiv.innerHTML;
         }
         function updateProgress(percent) {
