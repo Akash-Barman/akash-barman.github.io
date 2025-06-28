@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitrage Pro | Direct Quote Engine</title>
+    <title>Arbitrage Pro | High-Speed Scanning</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -742,7 +742,7 @@
     </div>
 
     <div class="fixed-bottom">
-        <div class="version">Arbitrage Pro v3.6 | Direct Quote Engine</div>
+        <div class="version">Arbitrage Pro v3.7 | Robust Scanning Engine</div>
     </div>
 
     <script>
@@ -805,7 +805,17 @@
             document.getElementById('checksumStatus').className = checksummedAddr ? 'success' : 'error';
         }
         
-        async function toggleAutoScanner() {
+        function stopAutoScan() {
+             isAutoScanning = false;
+             const autoScanBtn = document.getElementById('autoScanToggle');
+             const scanAllBtn = document.getElementById('scanAll');
+             scanAllBtn.disabled = false;
+             autoScanBtn.innerHTML = '<i class="fas fa-robot"></i> Start Auto-Scan';
+             autoScanBtn.classList.remove('active-scan');
+             logMessage('Auto-scanner stopped.');
+        }
+
+        function toggleAutoScanner() {
             isAutoScanning = !isAutoScanning;
             const autoScanBtn = document.getElementById('autoScanToggle');
             const scanAllBtn = document.getElementById('scanAll');
@@ -817,19 +827,17 @@
                 logMessage('Auto-scanner started. Searching for first profitable opportunity...');
                 findFirstOpportunity();
             } else {
-                scanAllBtn.disabled = false;
-                autoScanBtn.innerHTML = '<i class="fas fa-robot"></i> Start Auto-Scan';
-                autoScanBtn.classList.remove('active-scan');
-                logMessage('Auto-scanner stopped.');
+                stopAutoScan();
             }
         }
 
         async function findFirstOpportunity() {
             while (isAutoScanning) {
                 const allPaths = generateCrossDexPaths();
-                const opportunity = await scanForOpportunities(allPaths, true); // stopOnFirst = true
+                const opportunity = await scanForOpportunities(allPaths, true);
                 if (opportunity) {
-                    toggleAutoScanner(); // Stop scanning
+                    logMessage(`Opportunity found! Auto-scan stopped.`, false);
+                    stopAutoScan();
                     break;
                 }
                 if (isAutoScanning) {
@@ -870,37 +878,29 @@
                 const amounts = await router.getAmountsOut(amountIn, path.map(t => t.address));
                 return amounts[amounts.length - 1];
             } catch (e) {
-                return ethers.BigNumber.from(0); // Return 0 if the pair doesn't exist on the router
+                return ethers.BigNumber.from(0);
             }
         }
-
+        
+        // Parallel scanning function
         async function scanForOpportunities(pathsToScan, stopOnFirst = false) {
             if (!signer) return logMessage("Please connect wallet first.", true);
-
             logMessage(`Scanning ${pathsToScan.length} total possible paths...`);
             if (!isAutoScanning) document.getElementById('scanAll').disabled = true;
             document.getElementById('executeTrade').disabled = true;
-            
-            let bestOpportunity = { profit: -Infinity };
-            let pathsChecked = 0;
 
-            for (const pathInfo of pathsToScan) {
-                if(stopOnFirst && bestOpportunity.profit > MIN_PROFIT_THRESHOLD) break;
-
-                try {
+            const checkPath = async (pathInfo) => {
+                 try {
                     const amountIn = ethers.utils.parseUnits(FLASH_LOAN_AMOUNT.toString(), pathInfo.tokenPath[0].decimals);
                     
-                    // Step 1: WBNB -> Token A on Dex1
                     let amountOut1 = await getAmountOutFromRouter(amountIn, [pathInfo.tokenPath[0], pathInfo.tokenPath[1]], pathInfo.dexPath[0]);
-                    if (amountOut1.isZero()) continue;
+                    if (amountOut1.isZero()) return null;
                     
-                    // Step 2: Token A -> Token B on Dex2
                     let amountOut2 = await getAmountOutFromRouter(amountOut1, [pathInfo.tokenPath[1], pathInfo.tokenPath[2]], pathInfo.dexPath[1]);
-                    if (amountOut2.isZero()) continue;
+                    if (amountOut2.isZero()) return null;
 
-                    // Step 3: Token B -> WBNB on PancakeSwap (for flash loan repayment)
                     let finalAmountOut = await getAmountOutFromRouter(amountOut2, [pathInfo.tokenPath[2], pathInfo.tokenPath[3]], 'PancakeSwap');
-                    if (finalAmountOut.isZero()) continue;
+                    if (finalAmountOut.isZero()) return null;
 
                     const slippageFactor = (100 - SLIPPAGE_TOLERANCE) / 100;
                     const minAmountOut = finalAmountOut.mul(Math.floor(slippageFactor * 10000)).div(10000);
@@ -909,28 +909,37 @@
                     if (profit.gt(0)) {
                         const profitPercentage = (profit.mul(10000).div(amountIn)).toNumber() / 100;
                         if (profitPercentage > MIN_PROFIT_THRESHOLD) {
-                            if (profitPercentage > bestOpportunity.profit) {
-                                bestOpportunity = {
-                                    profit: profitPercentage,
-                                    path: pathInfo.tokenPath.map(p => p.address),
-                                    dexes: [DEXS[pathInfo.dexPath[0]].factory, DEXS[pathInfo.dexPath[1]].factory],
-                                    name: pathInfo.name,
-                                    amountIn: amountIn,
-                                };
-                            }
+                            return { profit: profitPercentage, path: pathInfo.tokenPath.map(p => p.address), dexes: [DEXS[pathInfo.dexPath[0]].factory, DEXS[pathInfo.dexPath[1]].factory], name: pathInfo.name, amountIn };
                         }
                     }
-                } catch(e) { /* Suppress errors */ }
+                } catch(e) { return null; }
+                return null;
+            };
 
-                pathsChecked++;
-                if (!stopOnFirst) updateProgress((pathsChecked / pathsToScan.length) * 100);
+            let bestOpportunity = { profit: -Infinity };
+            const chunkSize = 50; 
+            for (let i = 0; i < pathsToScan.length; i += chunkSize) {
+                if (stopOnFirst && bestOpportunity.profit > MIN_PROFIT_THRESHOLD) break;
+                if (!isAutoScanning && i > 0) break; // Stop manual scan if user cancels
+
+                const chunk = pathsToScan.slice(i, i + chunkSize);
+                const promises = chunk.map(p => checkPath(p));
+                const results = await Promise.all(promises);
+
+                for (const opportunity of results) {
+                    if (opportunity && opportunity.profit > bestOpportunity.profit) {
+                        bestOpportunity = opportunity;
+                    }
+                }
+                
+                if(!stopOnFirst) updateProgress(((i + chunkSize) / pathsToScan.length) * 100);
             }
             
             if (bestOpportunity.profit > MIN_PROFIT_THRESHOLD) {
                 logMessage(`SUCCESS: New best opportunity found! Path: ${bestOpportunity.name} Profit: ${bestOpportunity.profit.toFixed(4)}%`, false);
                 currentOpportunity = bestOpportunity;
                 document.getElementById('executeTrade').disabled = false;
-                if(stopOnFirst) return bestOpportunity;
+                if (stopOnFirst) return bestOpportunity;
             } else if (!stopOnFirst) {
                 logMessage("Scan complete. No profitable opportunities found.", true);
             }
@@ -938,7 +947,7 @@
             if (!isAutoScanning) document.getElementById('scanAll').disabled = false;
             return null;
         }
-        
+
         async function executeTrade() {
             if (!currentOpportunity) return logMessage("No opportunity to execute.", true);
             logMessage(`Preparing to execute: ${currentOpportunity.name}`);
@@ -950,16 +959,7 @@
                 const gasPrice = await provider.getGasPrice();
                 document.getElementById('gasPriceDisplay').textContent = `${parseFloat(ethers.utils.formatUnits(gasPrice, 'gwei')).toFixed(2)} Gwei`;
                 
-                // Note: The final trade path (B->WBNB) is hardcoded to PancakeSwap in the contract
-                const dexFactoriesForTx = [currentOpportunity.dexes[0], currentOpportunity.dexes[1]];
-
-                const estimatedGasLimit = await contract.estimateGas.executeArbitrage(
-                    currentOpportunity.path[0],
-                    currentOpportunity.amountIn,
-                    currentOpportunity.path,
-                    dexFactoriesForTx
-                );
-
+                const estimatedGasLimit = await contract.estimateGas.executeArbitrage(currentOpportunity.path[0], currentOpportunity.amountIn, currentOpportunity.path, currentOpportunity.dexes);
                 const gasLimit = estimatedGasLimit.mul(120).div(100);
                 const totalGasFee = gasPrice.mul(gasLimit);
                 const feeInBnb = ethers.utils.formatEther(totalGasFee);
@@ -967,14 +967,7 @@
                 logMessage(`Estimated network fee: ${feeInBnb} BNB. Please confirm in your wallet.`);
                 document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-fire"></i> Estimated Fee: <strong>${parseFloat(feeInBnb).toFixed(8)} BNB</strong></div><div class="execution-status status-pending" style="margin-top: 5px;"><i class="fas fa-wallet"></i> Waiting for wallet confirmation...</div>`;
 
-                const tx = await contract.executeArbitrage(
-                    currentOpportunity.path[0],
-                    currentOpportunity.amountIn,
-                    currentOpportunity.path,
-                    dexFactoriesForTx,
-                    { gasPrice, gasLimit }
-                );
-                
+                const tx = await contract.executeArbitrage(currentOpportunity.path[0], currentOpportunity.amountIn, currentOpportunity.path, currentOpportunity.dexes, { gasPrice, gasLimit });
                 logMessage(`Transaction sent with hash: ${tx.hash}`);
                 document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-hourglass-half"></i> Tx Sent: <a href="https://bscscan.com/tx/${tx.hash}" target="_blank" class="tx-link">${tx.hash}</a></div>`;
                 
@@ -1026,11 +1019,12 @@
         function logMessage(message, isError = false) {
             const resultDiv = document.getElementById('result');
             const timestamp = new Date().toLocaleTimeString();
-            resultDiv.innerHTML = `<div>[${timestamp}] <span class="${isError ? 'error' : 'info'}">${message}</span></div>` + resultDiv.innerHTML;
+            resultDiv.innerHTML = `<div style="margin-bottom: 5px;">[${timestamp}] <span class="${isError ? 'error' : 'info'}">${message}</span></div>` + resultDiv.innerHTML;
         }
         function updateProgress(percent) {
-            document.getElementById('scanProgress').style.width = `${percent}%`;
-            document.getElementById('progressPercent').textContent = `${Math.round(percent)}%`;
+            const progress = Math.min(100, Math.round(percent));
+            document.getElementById('scanProgress').style.width = `${progress}%`;
+            document.getElementById('progressPercent').textContent = `${progress}%`;
         }
 
         // SIMULATED FUNCTIONS (UNCHANGED)
