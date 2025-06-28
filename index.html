@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitrage Pro | Multi-DEX Scanning</title>
+    <title>Arbitrage Pro | Direct Quote Engine</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -624,7 +624,7 @@
 
                 <div class="slippage-control" style="margin-top: 15px;">
                     <span>Min Profit %:</span>
-                    <input type="number" id="minProfitInput" class="slippage-input" value="6.0" min="0.1" max="100" step="0.1">
+                    <input type="number" id="minProfitInput" class="slippage-input" value="1.0" min="0.1" max="100" step="0.1">
                 </div>
                 
                 <div class="slippage-control">
@@ -689,8 +689,8 @@
                     <div class="config-value" id="walletStatus">Not Connected</div>
                 </div>
                 <div class="config-item">
-                    <div class="config-label">Factory Version</div>
-                    <div class="config-value" id="factoryVersion">V2</div>
+                    <div class="config-label">DEXs Active</div>
+                    <div class="config-value" id="dexesActive">3</div>
                 </div>
             </div>
 
@@ -742,7 +742,7 @@
     </div>
 
     <div class="fixed-bottom">
-        <div class="version">Arbitrage Pro v3.5 | Multi-DEX Engine</div>
+        <div class="version">Arbitrage Pro v3.6 | Direct Quote Engine</div>
     </div>
 
     <script>
@@ -750,23 +750,15 @@
         // CONFIGURATION
         // ======================
         const RAW_CONTRACT_ADDRESS = "0x4673fb316EaD2f9a9C1C8A9b40484384d55360De"; 
-        let MIN_PROFIT_THRESHOLD = 6.0;
-        let FLASH_LOAN_AMOUNT = 1.0; 
-        let SLIPPAGE_TOLERANCE = 1.0; 
+        let MIN_PROFIT_THRESHOLD = 1.0;
+        let FLASH_LOAN_AMOUNT = 12.0; 
+        let SLIPPAGE_TOLERANCE = 5.0; 
 
         function toChecksumAddress(address) {
-            try {
-                return ethers.utils.getAddress(address.toLowerCase());
-            } catch {
-                console.error("Invalid address:", address);
-                return null;
-            }
+            try { return ethers.utils.getAddress(address.toLowerCase()); } catch { return null; }
         }
 
-        const CONTRACT_ABI = [
-            "function executeArbitrage(address,uint256,address[],address[])", // Updated ABI for multi-dex
-            "function owner() view returns (address)"
-        ];
+        const CONTRACT_ABI = ["function executeArbitrage(address,uint256,address[],address[])", "function owner() view returns (address)"];
 
         const TOKENS = {
             WBNB: { address: toChecksumAddress("0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c"), decimals: 18, symbol: 'WBNB' },
@@ -780,14 +772,14 @@
         };
         
         const DEXS = {
-            PancakeSwap: { factory: toChecksumAddress('0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73'), fee: 9975 },
-            ApeSwap: { factory: toChecksumAddress('0x0841BD0B734E4F5853f0dD8d7Ea041c241fb0Da6'), fee: 9980 }, // 0.2% fee
-            BiSwap: { factory: toChecksumAddress('0x858E3312ed3A876947EA49d572A7C42DE08af7EE'), fee: 9990 }  // 0.1% fee
+            PancakeSwap: { router: toChecksumAddress('0x10ED43C718714eb63d5aA57B78B54704E256024E'), factory: toChecksumAddress('0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73') },
+            ApeSwap: { router: toChecksumAddress('0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7'), factory: toChecksumAddress('0x0841BD0B734E4F5853f0dD8d7Ea041c241fb0Da6') },
+            BiSwap: { router: toChecksumAddress('0x3a6d8cA21D1CF76F653A67577FA0D27453350dD8'), factory: toChecksumAddress('0x858E3312ed3A876947EA49d572A7C42DE08af7EE') }
         };
         
-        const FACTORY_ABI = ['function getPair(address,address) external view returns (address)'];
+        const ROUTER_ABI = ['function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)'];
 
-        let provider, signer, contract, walletAddress;
+        let provider, signer, contract;
         let currentOpportunity = null;
         let isAutoScanning = false;
 
@@ -802,58 +794,27 @@
             document.getElementById('executeTrade').addEventListener('click', executeTrade);
             document.getElementById('viewContract').addEventListener('click', viewContract);
             document.getElementById('autoScanToggle').addEventListener('click', toggleAutoScanner);
-            document.getElementById('slippageInput').addEventListener('change', updateSlippage);
-            document.getElementById('minProfitInput').addEventListener('change', updateMinProfit);
-            document.getElementById('flashLoanInput').addEventListener('change', updateFlashLoanAmount);
+            document.getElementById('slippageInput').addEventListener('change', (e) => { SLIPPAGE_TOLERANCE = parseFloat(e.target.value); logMessage(`Slippage set to ${SLIPPAGE_TOLERANCE}%`); });
+            document.getElementById('minProfitInput').addEventListener('change', (e) => { MIN_PROFIT_THRESHOLD = parseFloat(e.target.value); logMessage(`Min Profit set to ${MIN_PROFIT_THRESHOLD}%`); });
+            document.getElementById('flashLoanInput').addEventListener('change', (e) => { FLASH_LOAN_AMOUNT = parseFloat(e.target.value); logMessage(`Flash Loan set to ${FLASH_LOAN_AMOUNT} BNB`); });
             document.getElementById('runBacktest').addEventListener('click', runBacktest);
             document.getElementById('comparePrices').addEventListener('click', compareDexPrices);
             
             const checksummedAddr = toChecksumAddress(RAW_CONTRACT_ADDRESS);
-            const isValid = ethers.utils.isAddress(checksummedAddr);
-            document.getElementById('checksumStatus').textContent = isValid ? '✅ Valid' : '❌ Invalid';
-            document.getElementById('checksumStatus').className = isValid ? 'success' : 'error';
-        }
-        
-        function copyContractAddress() {
-            const address = document.getElementById('contractAddress').textContent;
-            navigator.clipboard.writeText(address).then(() => {
-                logMessage('Contract address copied to clipboard');
-            });
-        }
-        
-        function updateSlippage(e) {
-            SLIPPAGE_TOLERANCE = parseFloat(e.target.value);
-            logMessage(`Slippage tolerance set to: ${SLIPPAGE_TOLERANCE}%`);
-        }
-
-        function updateMinProfit(e) {
-            MIN_PROFIT_THRESHOLD = parseFloat(e.target.value);
-            logMessage(`Minimum profit threshold set to: ${MIN_PROFIT_THRESHOLD}%`);
-        }
-        
-        function updateFlashLoanAmount(e) {
-            const newAmount = parseFloat(e.target.value);
-            if (newAmount >= 0.1 && newAmount <= 1000) {
-                FLASH_LOAN_AMOUNT = newAmount;
-                logMessage(`Flash loan amount set to: ${FLASH_LOAN_AMOUNT} BNB`);
-            } else {
-                logMessage(`Flash loan amount must be between 0.1 and 1000 BNB`, true);
-                e.target.value = FLASH_LOAN_AMOUNT;
-            }
+            document.getElementById('checksumStatus').textContent = checksummedAddr ? '✅ Valid' : '❌ Invalid';
+            document.getElementById('checksumStatus').className = checksummedAddr ? 'success' : 'error';
         }
         
         async function toggleAutoScanner() {
+            isAutoScanning = !isAutoScanning;
             const autoScanBtn = document.getElementById('autoScanToggle');
             const scanAllBtn = document.getElementById('scanAll');
-            isAutoScanning = !isAutoScanning;
 
             if (isAutoScanning) {
                 scanAllBtn.disabled = true;
                 autoScanBtn.innerHTML = '<i class="fas fa-stop-circle"></i> Stop Scan';
                 autoScanBtn.classList.add('active-scan');
                 logMessage('Auto-scanner started. Searching for first profitable opportunity...');
-                
-                // This function will run in a loop until it finds something or is stopped
                 findFirstOpportunity();
             } else {
                 scanAllBtn.disabled = false;
@@ -866,10 +827,9 @@
         async function findFirstOpportunity() {
             while (isAutoScanning) {
                 const allPaths = generateCrossDexPaths();
-                const opportunity = await scanForOpportunities(allPaths, true); // true = stopOnFirst
+                const opportunity = await scanForOpportunities(allPaths, true); // stopOnFirst = true
                 if (opportunity) {
-                    logMessage(`Opportunity found! Auto-scan stopped.`, false);
-                    toggleAutoScanner(); // This will set isAutoScanning to false and break the loop
+                    toggleAutoScanner(); // Stop scanning
                     break;
                 }
                 if (isAutoScanning) {
@@ -886,22 +846,16 @@
             const dexKeys = Object.keys(DEXS);
             const paths = [];
 
-            for (let i = 0; i < otherTokens.length; i++) {
-                for (let j = 0; j < otherTokens.length; j++) {
-                    if (i === j) continue;
-
-                    const tokenA = otherTokens[i];
-                    const tokenB = otherTokens[j];
-                    
-                    // Iterate through all DEX combinations for the 2 swaps
+            for (const tokenA of otherTokens) {
+                for (const tokenB of otherTokens) {
+                    if (tokenA.address === tokenB.address) continue;
                     for (const dex1 of dexKeys) {
                         for (const dex2 of dexKeys) {
-                            const path = {
+                            paths.push({
                                 tokenPath: [baseToken, tokenA, tokenB, baseToken],
                                 dexPath: [dex1, dex2],
-                                name: `${baseToken.symbol} → ${tokenA.symbol} (${dex1}) → ${tokenB.symbol} (${dex2})`
-                            };
-                            paths.push(path);
+                                name: `${baseToken.symbol}→${tokenA.symbol}(${dex1})→${tokenB.symbol}(${dex2})`
+                            });
                         }
                     }
                 }
@@ -909,22 +863,14 @@
             return paths;
         }
 
-        async function getPairInfo(tokenA, tokenB, dexName) {
+        async function getAmountOutFromRouter(amountIn, path, dexName) {
             try {
-                const dex = DEXS[dexName];
-                const factory = new ethers.Contract(dex.factory, FACTORY_ABI, provider);
-                const [sortedTokenA, sortedTokenB] = tokenA.toLowerCase() < tokenB.toLowerCase() ? [tokenA, tokenB] : [tokenB, tokenA];
-
-                const pairAddress = await factory.getPair(sortedTokenA, sortedTokenB);
-                if (pairAddress === ethers.constants.AddressZero) return null;
-
-                const PAIR_ABI = ['function getReserves() external view returns (uint112,uint112,uint32)', 'function token0() external view returns (address)'];
-                const pair = new ethers.Contract(pairAddress, PAIR_ABI, provider);
-
-                const [[reserve0, reserve1], token0] = await Promise.all([pair.getReserves(), pair.token0()]);
-                return { reserve0, reserve1, token0 };
+                const routerAddress = DEXS[dexName].router;
+                const router = new ethers.Contract(routerAddress, ROUTER_ABI, provider);
+                const amounts = await router.getAmountsOut(amountIn, path.map(t => t.address));
+                return amounts[amounts.length - 1];
             } catch (e) {
-                return null;
+                return ethers.BigNumber.from(0); // Return 0 if the pair doesn't exist on the router
             }
         }
 
@@ -941,58 +887,47 @@
             for (const pathInfo of pathsToScan) {
                 if(stopOnFirst && bestOpportunity.profit > MIN_PROFIT_THRESHOLD) break;
 
-                const tokenPath = pathInfo.tokenPath;
-                const dexPath = pathInfo.dexPath;
-                const pathSymbols = tokenPath.map(p => p.symbol);
-                
                 try {
-                    const amountIn = ethers.utils.parseUnits(FLASH_LOAN_AMOUNT.toString(), tokenPath[0].decimals);
-                    let amountOut = amountIn;
+                    const amountIn = ethers.utils.parseUnits(FLASH_LOAN_AMOUNT.toString(), pathInfo.tokenPath[0].decimals);
                     
-                    for (let i = 0; i < dexPath.length; i++) {
-                        const tokenIn = tokenPath[i];
-                        const pairInfo = await getPairInfo(tokenIn.address, tokenPath[i+1].address, dexPath[i]);
-                        
-                        if (!pairInfo) {
-                            throw new Error(`No pool on ${dexPath[i]}`);
-                        }
+                    // Step 1: WBNB -> Token A on Dex1
+                    let amountOut1 = await getAmountOutFromRouter(amountIn, [pathInfo.tokenPath[0], pathInfo.tokenPath[1]], pathInfo.dexPath[0]);
+                    if (amountOut1.isZero()) continue;
+                    
+                    // Step 2: Token A -> Token B on Dex2
+                    let amountOut2 = await getAmountOutFromRouter(amountOut1, [pathInfo.tokenPath[1], pathInfo.tokenPath[2]], pathInfo.dexPath[1]);
+                    if (amountOut2.isZero()) continue;
 
-                        const [reserveIn, reserveOut] = tokenIn.address.toLowerCase() === pairInfo.token0.toLowerCase()
-                            ? [pairInfo.reserve0, pairInfo.reserve1]
-                            : [pairInfo.reserve1, pairInfo.reserve0];
-                        
-                        amountOut = getAmountOut(amountOut, reserveIn, reserveOut, DEXS[dexPath[i]].fee);
-                    }
-                    
+                    // Step 3: Token B -> WBNB on PancakeSwap (for flash loan repayment)
+                    let finalAmountOut = await getAmountOutFromRouter(amountOut2, [pathInfo.tokenPath[2], pathInfo.tokenPath[3]], 'PancakeSwap');
+                    if (finalAmountOut.isZero()) continue;
+
                     const slippageFactor = (100 - SLIPPAGE_TOLERANCE) / 100;
-                    const minAmountOut = amountOut.mul(Math.floor(slippageFactor * 10000)).div(10000);
+                    const minAmountOut = finalAmountOut.mul(Math.floor(slippageFactor * 10000)).div(10000);
                     const profit = minAmountOut.sub(amountIn);
 
                     if (profit.gt(0)) {
                         const profitPercentage = (profit.mul(10000).div(amountIn)).toNumber() / 100;
                         if (profitPercentage > MIN_PROFIT_THRESHOLD) {
                             if (profitPercentage > bestOpportunity.profit) {
-                                 bestOpportunity = {
+                                bestOpportunity = {
                                     profit: profitPercentage,
-                                    path: tokenPath.map(p => p.address),
-                                    dexes: dexPath.map(d => DEXS[d].factory),
-                                    pathSymbols: pathSymbols,
-                                    dexSymbols: dexPath,
+                                    path: pathInfo.tokenPath.map(p => p.address),
+                                    dexes: [DEXS[pathInfo.dexPath[0]].factory, DEXS[pathInfo.dexPath[1]].factory],
+                                    name: pathInfo.name,
                                     amountIn: amountIn,
-                                    profitAbs: profit,
                                 };
                             }
                         }
                     }
-                } catch(e) { /* Supress errors for clean logs */ }
+                } catch(e) { /* Suppress errors */ }
 
                 pathsChecked++;
                 if (!stopOnFirst) updateProgress((pathsChecked / pathsToScan.length) * 100);
             }
             
             if (bestOpportunity.profit > MIN_PROFIT_THRESHOLD) {
-                const pathName = `${bestOpportunity.pathSymbols[0]} → ${bestOpportunity.pathSymbols[1]} (${bestOpportunity.dexSymbols[0]}) → ${bestOpportunity.pathSymbols[2]} (${bestOpportunity.dexSymbols[1]}) → ${bestOpportunity.pathSymbols[3]}`;
-                logMessage(`SUCCESS: New best opportunity found! Path: ${pathName} Profit: ${bestOpportunity.profit.toFixed(4)}%`, false);
+                logMessage(`SUCCESS: New best opportunity found! Path: ${bestOpportunity.name} Profit: ${bestOpportunity.profit.toFixed(4)}%`, false);
                 currentOpportunity = bestOpportunity;
                 document.getElementById('executeTrade').disabled = false;
                 if(stopOnFirst) return bestOpportunity;
@@ -1001,22 +936,12 @@
             }
             
             if (!isAutoScanning) document.getElementById('scanAll').disabled = false;
-            return null; // No opportunity found
+            return null;
         }
         
-        function getAmountOut(amountIn, reserveIn, reserveOut, fee) {
-            if (reserveIn.isZero() || reserveOut.isZero()) return ethers.BigNumber.from(0);
-            const amountInWithFee = amountIn.mul(fee);
-            const numerator = amountInWithFee.mul(reserveOut);
-            const denominator = reserveIn.mul(10000).add(amountInWithFee);
-            return numerator.div(denominator);
-        }
-
         async function executeTrade() {
             if (!currentOpportunity) return logMessage("No opportunity to execute.", true);
-            const pathName = `${currentOpportunity.pathSymbols[0]} → ${currentOpportunity.pathSymbols[1]} (${currentOpportunity.dexSymbols[0]}) → ${currentOpportunity.pathSymbols[2]} (${currentOpportunity.dexSymbols[1]}) → ${currentOpportunity.pathSymbols[3]}`;
-
-            logMessage(`Preparing to execute: ${pathName}`);
+            logMessage(`Preparing to execute: ${currentOpportunity.name}`);
             const executeBtn = document.getElementById('executeTrade');
             executeBtn.disabled = true;
             document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-cogs"></i> Estimating gas fee...</div>`;
@@ -1025,31 +950,28 @@
                 const gasPrice = await provider.getGasPrice();
                 document.getElementById('gasPriceDisplay').textContent = `${parseFloat(ethers.utils.formatUnits(gasPrice, 'gwei')).toFixed(2)} Gwei`;
                 
+                // Note: The final trade path (B->WBNB) is hardcoded to PancakeSwap in the contract
+                const dexFactoriesForTx = [currentOpportunity.dexes[0], currentOpportunity.dexes[1]];
+
                 const estimatedGasLimit = await contract.estimateGas.executeArbitrage(
                     currentOpportunity.path[0],
                     currentOpportunity.amountIn,
                     currentOpportunity.path,
-                    currentOpportunity.dexes
+                    dexFactoriesForTx
                 );
 
-                const gasLimit = estimatedGasLimit.mul(120).div(100); 
+                const gasLimit = estimatedGasLimit.mul(120).div(100);
                 const totalGasFee = gasPrice.mul(gasLimit);
                 const feeInBnb = ethers.utils.formatEther(totalGasFee);
 
                 logMessage(`Estimated network fee: ${feeInBnb} BNB. Please confirm in your wallet.`);
-                document.getElementById('executionResult').innerHTML = `
-                    <div class="execution-status status-pending">
-                        <i class="fas fa-fire"></i> Estimated Fee: <strong>${parseFloat(feeInBnb).toFixed(8)} BNB</strong>
-                    </div>
-                    <div class="execution-status status-pending" style="margin-top: 5px;">
-                        <i class="fas fa-wallet"></i> Waiting for wallet confirmation...
-                    </div>`;
+                document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-fire"></i> Estimated Fee: <strong>${parseFloat(feeInBnb).toFixed(8)} BNB</strong></div><div class="execution-status status-pending" style="margin-top: 5px;"><i class="fas fa-wallet"></i> Waiting for wallet confirmation...</div>`;
 
                 const tx = await contract.executeArbitrage(
                     currentOpportunity.path[0],
                     currentOpportunity.amountIn,
                     currentOpportunity.path,
-                    currentOpportunity.dexes,
+                    dexFactoriesForTx,
                     { gasPrice, gasLimit }
                 );
                 
@@ -1088,9 +1010,7 @@
                 if (network.chainId !== 56) return logMessage("Warning: Not on BNB Chain.", true);
                 
                 signer = provider.getSigner();
-                walletAddress = await signer.getAddress();
-                const checksummedContractAddress = toChecksumAddress(RAW_CONTRACT_ADDRESS);
-                contract = new ethers.Contract(checksummedContractAddress, CONTRACT_ABI, signer);
+                contract = new ethers.Contract(toChecksumAddress(RAW_CONTRACT_ADDRESS), CONTRACT_ABI, signer);
                 
                 document.getElementById('walletStatus').textContent = "Connected";
                 document.getElementById('connectWallet').style.display = 'none';
@@ -1102,74 +1022,37 @@
             }
         }
         
-        function viewContract() {
-            window.open(`https://bscscan.com/address/${toChecksumAddress(RAW_CONTRACT_ADDRESS)}`, '_blank');
-        }
-
+        function viewContract() { window.open(`https://bscscan.com/address/${toChecksumAddress(RAW_CONTRACT_ADDRESS)}`, '_blank'); }
         function logMessage(message, isError = false) {
             const resultDiv = document.getElementById('result');
             const timestamp = new Date().toLocaleTimeString();
-            const messageElem = document.createElement('div');
-            messageElem.textContent = `[${timestamp}] ${message}`;
-            messageElem.className = isError ? 'error' : (message.toLowerCase().includes('success') ? 'success' : 'info');
-            resultDiv.prepend(messageElem);
+            resultDiv.innerHTML = `<div>[${timestamp}] <span class="${isError ? 'error' : 'info'}">${message}</span></div>` + resultDiv.innerHTML;
         }
-
         function updateProgress(percent) {
             document.getElementById('scanProgress').style.width = `${percent}%`;
             document.getElementById('progressPercent').textContent = `${Math.round(percent)}%`;
         }
 
-        // =================================
         // SIMULATED FUNCTIONS (UNCHANGED)
-        // =================================
         async function runBacktest() {
             logMessage("Running backtest with historical data (simulation)...");
             const backtestResultsEl = document.getElementById('backtestResults');
             backtestResultsEl.style.display = 'block';
             backtestResultsEl.innerHTML = '<div class="spinner" style="display:block; margin: 10px auto;"></div>';
-            
-            const timeRange = document.getElementById('backtestTimeRange').value;
             await new Promise(resolve => setTimeout(resolve, 1500));
-            const simulatedResults = {
-                opportunitiesFound: Math.floor(Math.random() * 50) + 10,
-                avgProfit: (Math.random() * 5 + 2).toFixed(2),
-                successRate: (Math.random() * 30 + 70).toFixed(1),
-            };
+            const simulatedResults = { opportunitiesFound: Math.floor(Math.random() * 50) + 10, avgProfit: (Math.random() * 5 + 2).toFixed(2), successRate: (Math.random() * 30 + 70).toFixed(1) };
             backtestResultsEl.innerHTML = `<div class="sim-success"><div class="reserve-row"><span class="reserve-label">Opportunities Found:</span> <span class="reserve-value">${simulatedResults.opportunitiesFound}</span></div><div class="reserve-row"><span class="reserve-label">Average Profit:</span> <span class="reserve-value">${simulatedResults.avgProfit}%</span></div><div class="reserve-row"><span class="reserve-label">Est. Success Rate:</span> <span class="reserve-value">${simulatedResults.successRate}%</span></div></div>`;
-            logMessage(`Backtest for last ${timeRange}h completed.`);
         }
-
         async function compareDexPrices() {
-            const tokenSymbol = document.getElementById('dexTokenSelect').value;
-            logMessage(`Comparing ${tokenSymbol} prices across DEXs (simulation)...`);
-            
+            logMessage(`Comparing prices across DEXs (simulation)...`);
             const dexComparisonEl = document.getElementById('dexComparison');
             dexComparisonEl.style.display = 'block';
             dexComparisonEl.innerHTML = '<div class="spinner" style="display:block; margin: 10px auto;"></div>';
-
             await new Promise(resolve => setTimeout(resolve, 1500));
-            const basePrice = 300 + (Math.random() * 50);
             let priceHTML = '';
-            
-            const dexKeys = Object.keys(DEXS);
-            const prices = dexKeys.map(dex => ({
-                name: dex,
-                price: basePrice * (1 + (Math.random() - 0.5) * 0.02)
-            }));
-
-            prices.forEach(dex => {
-                priceHTML += `<div class="dex-comparison-row"><div class="dex-name">${dex.name}:</div><div class="dex-price">${dex.price.toFixed(4)} USD</div></div>`;
-            });
-            
-            const best = prices.reduce((max, p) => p.price > max.price ? p : max, prices[0]);
-            const worst = prices.reduce((min, p) => p.price < min.price ? p : min, prices[0]);
-            const diff = ((best.price - worst.price) / worst.price * 100).toFixed(2);
-            
-            priceHTML += `<div class="reserve-row" style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 5px;"><span class="reserve-label">Max Difference:</span> <span class="reserve-value ${diff > 0.5 ? 'success' : 'warning'}">${diff}%</span></div>`;
-            
+            const prices = Object.keys(DEXS).map(dex => ({ name: dex, price: (300 + (Math.random() - 0.5) * 20) }));
+            prices.forEach(dex => { priceHTML += `<div class="dex-comparison-row"><div class="dex-name">${dex.name}:</div><div class="dex-price">${dex.price.toFixed(4)} USD</div></div>`; });
             dexComparisonEl.innerHTML = priceHTML;
-            logMessage("DEX price comparison complete.");
         }
     </script>
 </body>
