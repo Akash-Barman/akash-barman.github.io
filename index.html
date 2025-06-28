@@ -3,249 +3,301 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BNB Chain Arbitrage Bot - Enhanced</title>
+    <title>Arbitrage Pro | Enhanced Trading Platform</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --primary: #3498db;
-            --secondary: #2c3e50;
-            --success: #2ecc71;
-            --warning: #f39c12;
-            --danger: #e74c3c;
-            --dark: #1a2530;
-            --light: #ecf0f1;
-            --card-bg: #1e2a38;
-            --border: #2c3e50;
-            --text: #ecf0f1;
-            --text-secondary: #bdc3c7;
+            --primary: #10B981;
+            --primary-dark: #047857;
+            --secondary: #6EE7B7;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --dark: #1F2937;
+            --darker: #111827;
+            --light: #E5E7EB;
+            --gray: #9CA3AF;
+            --card-bg: linear-gradient(145deg, #1f2a37, #111827);
+            --border: rgba(156, 163, 175, 0.2);
         }
         
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         }
         
         body {
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-            color: var(--text);
+            background: var(--darker);
+            color: var(--light);
+            line-height: 1.6;
+            padding: 20px;
             min-height: 100vh;
-            padding-bottom: 40px;
+            background-image: radial-gradient(circle at 10% 20%, rgba(31, 41, 55, 0.8) 0%, rgba(17, 24, 39, 1) 100%);
         }
         
         header {
-            background-color: rgba(26, 37, 48, 0.8);
-            padding: 20px;
             text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
             border-bottom: 1px solid var(--border);
-            backdrop-filter: blur(10px);
         }
         
         h1 {
-            font-size: 2.2rem;
-            margin-bottom: 5px;
-            color: var(--light);
+            color: var(--secondary);
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
         }
         
-        .subtitle {
-            font-size: 1rem;
-            color: var(--text-secondary);
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
             margin-bottom: 15px;
         }
         
-        .container {
+        .logo-icon {
+            background: var(--primary);
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
             display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            padding: 20px;
-            max-width: 1400px;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        .subtitle {
+            color: var(--gray);
+            font-size: 1.1rem;
+            max-width: 800px;
+            margin: 0 auto 25px;
+            font-weight: 400;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 25px;
+            max-width: 1200px;
             margin: 0 auto;
+        }
+        
+        @media (min-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
+            }
         }
         
         .card {
             background: var(--card-bg);
-            border-radius: 12px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+            border-radius: 16px;
             padding: 25px;
-            flex: 1;
-            min-width: 300px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
             border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(5px);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
         }
         
         .card h2 {
-            font-size: 1.5rem;
+            color: var(--secondary);
+            margin-top: 0;
             margin-bottom: 20px;
             display: flex;
             align-items: center;
             gap: 10px;
-            color: var(--primary);
-        }
-        
-        .section-title {
-            font-size: 1.2rem;
-            margin: 25px 0 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--border);
-            color: var(--primary);
-        }
-        
-        .config-item {
-            margin-bottom: 15px;
-        }
-        
-        .config-label {
-            font-size: 0.9rem;
-            margin-bottom: 5px;
-            color: var(--text-secondary);
-        }
-        
-        .token-input {
-            width: 100%;
-            padding: 12px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 1rem;
-        }
-        
-        .token-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-        
-        .token-input-row {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            align-items: center;
-        }
-        
-        .token-input-label {
-            min-width: 100px;
-            color: var(--text-secondary);
-        }
-        
-        .btn {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-        
-        .btn:hover {
-            background: #2980b9;
-            transform: translateY(-2px);
-        }
-        
-        .btn:active {
-            transform: translateY(0);
-        }
-        
-        .btn i {
-            font-size: 1.2rem;
-        }
-        
-        .status-container {
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 15px;
-        }
-        
-        .status-title {
-            font-size: 1.1rem;
-            margin-bottom: 10px;
-            color: var(--text-secondary);
-        }
-        
-        .reserve-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        
-        .reserve-label {
-            color: var(--text-secondary);
-        }
-        
-        .reserve-value {
+            font-size: 1.5rem;
             font-weight: 600;
         }
         
-        .success {
-            color: var(--success);
+        .card h2 i {
+            font-size: 1.4rem;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        button, .btn {
+            background: linear-gradient(to right, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 14px 18px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+            text-align: center;
+        }
+
+        #connectWallet {
+            grid-column: 1 / -1;
+        }
+        
+        button.active-scan, .btn.active-scan {
+            background: linear-gradient(to right, var(--success), #059669);
+        }
+        
+        button::before, .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+            transition: 0.5s;
+            z-index: -1;
+        }
+        
+        button:hover::before, .btn:hover::before {
+            left: 100%;
+        }
+        
+        button:hover, .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3);
+        }
+        
+        button:disabled, .btn:disabled {
+            background: #374151;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+        
+        button.secondary, .btn.secondary {
+            background: linear-gradient(to right, #8B5CF6, #7C3AED);
+        }
+        button.secondary:hover, .btn.secondary:hover {
+            box-shadow: 0 5px 15px rgba(139, 92, 246, 0.3);
+        }
+        
+        .status-container {
+            background-color: rgba(31, 41, 55, 0.7);
+            border-radius: 12px;
+            padding: 20px;
+            min-height: 200px;
+            margin-top: 20px;
+            overflow-y: auto;
+            max-height: 400px;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            font-size: 0.95rem;
+            position: relative;
+            border: 1px solid var(--border);
+        }
+        
+        #result {
+            white-space: pre-wrap;
+            line-height: 1.8;
         }
         
         .warning {
-            color: var(--warning);
-        }
-        
-        .error {
-            color: var(--danger);
-        }
-        
-        .simulation-panel {
-            background: rgba(0, 0, 0, 0.15);
-            border-radius: 8px;
-            padding: 20px;
-            margin-top: 15px;
-        }
-        
-        .simulation-title {
-            font-size: 1.1rem;
-            margin-bottom: 15px;
-            color: var(--primary);
-        }
-        
-        .simulation-result {
+            background-color: rgba(254, 226, 226, 0.1);
+            border-left: 4px solid var(--danger);
             padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-        }
-        
-        .sim-success {
-            background: rgba(46, 204, 113, 0.1);
-            border: 1px solid rgba(46, 204, 113, 0.3);
-        }
-        
-        .sim-failure {
-            background: rgba(231, 76, 60, 0.1);
-            border: 1px solid rgba(231, 76, 60, 0.3);
-        }
-        
-        .fixed-bottom {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(26, 37, 48, 0.9);
-            padding: 10px;
-            text-align: center;
+            border-radius: 4px;
+            margin-top: 25px;
             font-size: 0.9rem;
-            color: var(--text-secondary);
-            border-top: 1px solid var(--border);
-            backdrop-filter: blur(5px);
+        }
+        
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .config-item {
+            background: rgba(31, 41, 55, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        
+        .config-label {
+            font-size: 0.85rem;
+            color: var(--gray);
+            margin-bottom: 5px;
+        }
+        
+        .config-value {
+            font-weight: 600;
+            font-size: 1.1rem;
+            word-break: break-all;
+        }
+        
+        .progress-container {
+            margin: 25px 0;
+        }
+        
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: var(--gray);
+        }
+        
+        .progress {
+            height: 10px;
+            background: #374151;
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            width: 0%;
+            transition: width 0.5s ease;
         }
         
         .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            border-top: 4px solid var(--primary);
+            border: 4px solid rgba(110, 231, 183, 0.3);
             border-radius: 50%;
-            width: 30px;
-            height: 30px;
+            border-top: 4px solid var(--secondary);
+            width: 40px;
+            height: 40px;
             animation: spin 1s linear infinite;
             margin: 20px auto;
+            display: none;
         }
         
         @keyframes spin {
@@ -253,49 +305,320 @@
             100% { transform: rotate(360deg); }
         }
         
+        .success { color: var(--success); }
+        .error { color: var(--danger); }
+        .info { color: var(--secondary); }
+        
+        .opportunity-card {
+            background: rgba(31, 41, 55, 0.7);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            border: 1px solid var(--border);
+        }
+        
+        .token-row {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            gap: 10px;
+        }
+        
+        .token-info { flex: 1; }
+        .token-name { font-weight: bold; color: var(--secondary); }
+        .token-amount { font-size: 0.9rem; color: var(--gray); }
+        
+        .profit-badge {
+            background: var(--success);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+        
+        .section-title {
+            font-size: 1.2rem;
+            color: var(--secondary);
+            margin: 25px 0 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        
         .contract-section {
-            background: rgba(0, 0, 0, 0.15);
+            background: rgba(31, 41, 55, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border: 1px solid var(--border);
+        }
+        
+        .combo-buttons-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .combo-button {
+            background: linear-gradient(to right, #374151, #4B5563);
+            padding: 10px;
+            font-size: 0.9rem;
+        }
+        .combo-button:hover {
+            box-shadow: 0 5px 15px rgba(110, 231, 183, 0.2);
+            background: linear-gradient(to right, var(--primary), var(--primary-dark));
+        }
+        
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .status-good {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+        }
+        .status-error {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+        }
+        .status-warning {
+            background-color: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+        }
+        .fixed-bottom {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--darker);
+            padding: 10px 20px;
+            border-top: 1px solid var(--border);
+            z-index: 100;
+        }
+        .version {
+            text-align: center;
+            color: var(--gray);
+            font-size: 0.85rem;
+        }
+        .address-info {
+            font-size: 0.9rem;
+            color: var(--secondary);
+            margin: 5px 0;
+            word-break: break-all;
+        }
+        .simulation-panel {
+            background: rgba(31, 41, 55, 0.7);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid var(--border);
+        }
+        .simulation-title {
+            font-weight: bold;
+            color: var(--secondary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .gas-info {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+        }
+        .slippage-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .slippage-input {
+            background: rgba(31, 41, 55, 0.5);
+            border: 1px solid var(--gray);
+            border-radius: 5px;
+            padding: 8px;
+            color: white;
+            width: 80px;
+        }
+        .debug-container {
+            background-color: rgba(31, 41, 55, 0.7);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+            overflow-y: auto;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+        .tx-link {
+            color: var(--secondary);
+            text-decoration: none;
+        }
+        .tx-link:hover {
+            text-decoration: underline;
+        }
+        .simulation-result {
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        .sim-success {
+            background-color: rgba(16, 185, 129, 0.15);
+            border-left: 4px solid var(--success);
+        }
+        .sim-failure {
+            background-color: rgba(239, 68, 68, 0.15);
+            border-left: 4px solid var(--danger);
+        }
+        .custom-path {
+            background: rgba(31, 41, 55, 0.7);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            border: 1px solid var(--border);
+        }
+        .token-input-row {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            gap: 10px;
+        }
+        .token-input-label {
+            min-width: 100px;
+            color: var(--secondary);
+            font-weight: 600;
+        }
+        .token-input {
+            flex: 1;
+            background: rgba(31, 41, 55, 0.5);
+            border: 1px solid var(--gray);
+            border-radius: 5px;
+            padding: 10px;
+            color: white;
+        }
+        .custom-path-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .custom-path-btn {
+            flex: 1;
+        }
+        .flash-loan-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .flash-loan-input {
+            background: rgba(31, 41, 55, 0.5);
+            border: 1px solid var(--gray);
+            border-radius: 5px;
+            padding: 8px;
+            color: white;
+            width: 100px;
+        }
+        .flash-loan-info {
+            font-size: 0.85rem;
+            color: var(--gray);
+            margin-top: 5px;
+        }
+        .liquidity-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 5px 0;
+        }
+        .liquidity-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .liquidity-good {
+            background-color: var(--success);
+        }
+        .liquidity-warning {
+            background-color: var(--warning);
+        }
+        .liquidity-critical {
+            background-color: var(--danger);
+        }
+        .liquidity-status {
+            font-size: 0.9rem;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+        .lq-good {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+        }
+        .lq-warning {
+            background-color: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+        }
+        .lq-critical {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+        }
+        .reserve-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            padding: 3px 0;
+        }
+        .reserve-label {
+            color: var(--gray);
+        }
+        .reserve-value {
+            font-weight: 600;
+        }
+        .execution-status {
             padding: 15px;
             border-radius: 8px;
             margin-top: 15px;
+            font-size: 0.9rem;
+        }
+        .status-pending {
+            background-color: rgba(110, 231, 183, 0.15);
+            border-left: 4px solid var(--secondary);
+        }
+        .status-confirmed {
+            background-color: rgba(16, 185, 129, 0.15);
+            border-left: 4px solid var(--success);
+        }
+        .status-failed {
+            background-color: rgba(239, 68, 68, 0.15);
+            border-left: 4px solid var(--danger);
         }
         
         .contract-address {
-            font-family: monospace;
-            word-break: break-all;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 8px;
-            border-radius: 4px;
-            margin-top: 5px;
-            font-size: 0.85rem;
-        }
-        
-        .logs-container {
-            height: 200px;
-            overflow-y: auto;
-            background: rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(16, 185, 129, 0.1);
+            padding: 10px;
             border-radius: 8px;
-            padding: 15px;
-            margin-top: 15px;
-            font-family: monospace;
-            font-size: 0.9rem;
+            margin-top: 10px;
+            border: 1px solid var(--success);
         }
         
-        .log-entry {
-            padding: 5px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        .copy-btn {
+            background: none;
+            border: none;
+            color: var(--secondary);
+            cursor: pointer;
+            font-size: 1rem;
         }
-        
-        .log-timestamp {
-            color: var(--text-secondary);
-            margin-right: 10px;
-        }
-        
+
+        /* Styles for new features from INDEX2 */
         .dex-comparison-row {
             display: flex;
             align-items: center;
             padding: 10px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid var(--border);
         }
         
         .dex-name {
@@ -317,196 +640,140 @@
         }
         
         .opportunity-good {
-            background: rgba(46, 204, 113, 0.2);
+            background: rgba(16, 185, 129, 0.2);
             color: var(--success);
         }
         
         .opportunity-low {
-            background: rgba(243, 156, 18, 0.2);
+            background: rgba(245, 158, 11, 0.2);
             color: var(--warning);
-        }
-        
-        .progress-bar {
-            height: 6px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
-            margin-top: 5px;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: var(--primary);
-            border-radius: 3px;
-            width: 0%;
-            transition: width 0.5s ease;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-        
-        .status-good {
-            background: rgba(46, 204, 113, 0.2);
-            color: var(--success);
-        }
-        
-        .status-warning {
-            background: rgba(243, 156, 18, 0.2);
-            color: var(--warning);
-        }
-        
-        .status-error {
-            background: rgba(231, 76, 60, 0.2);
-            color: var(--danger);
-        }
-        
-        @media (max-width: 768px) {
-            .container {
-                flex-direction: column;
-            }
-            
-            .token-input-row {
-                flex-direction: column;
-                align-items: flex-start;
-            }
         }
     </style>
 </head>
 <body>
     <header>
-        <h1>BNB Chain Arbitrage Bot - Enhanced</h1>
+        <div class="logo">
+            <div class="logo-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <h1>Arbitrage Pro</h1>
+        </div>
         <div class="subtitle">
-            Advanced arbitrage scanner with multi-DEX support and backtesting
+            Professional trading platform with direct execution, backtesting, and multi-DEX analysis on BNB Chain
         </div>
         <div id="libraryStatus" class="success">Library status: <span class="status-badge status-good">ethers.js loaded</span></div>
     </header>
     
     <div class="container">
         <div class="card">
-            <h2><i>📊</i> Arbitrage Scanner</h2>
-            <div class="config-item">
-                <div class="config-label">Flash Loan Amount (BNB)</div>
-                <input type="range" id="loanAmount" min="0.1" max="10" step="0.1" value="1.0" class="token-input">
-                <div class="token-input-row">
-                    <span>0.1 BNB</span>
-                    <span id="loanAmountValue" class="reserve-value">1.0 BNB</span>
-                    <span>10 BNB</span>
+            <h2><i class="fas fa-search"></i> Arbitrage Scanner</h2>
+            <div class="controls">
+                <button id="connectWallet">
+                    <i class="fas fa-wallet"></i> Connect Wallet
+                </button>
+                 <button id="scanAll" disabled>
+                    <i class="fas fa-search"></i> Scan All Combos
+                </button>
+                 <button id="autoScanToggle" disabled>
+                    <i class="fas fa-robot"></i> Start Auto-Scan
+                </button>
+                 <button id="executeTrade" disabled class="secondary">
+                    <i class="fas fa-bolt"></i> Execute Best Trade
+                </button>
+            </div>
+            
+            <div class="simulation-panel">
+                <div class="simulation-title"><i class="fas fa-cog"></i> Transaction Settings</div>
+                
+                <div class="flash-loan-control">
+                    <span>Flash Loan Amount:</span>
+                    <input type="number" id="flashLoanInput" class="flash-loan-input" value="1.0" min="0.1" max="1000" step="0.1">
+                    <span>BNB</span>
+                </div>
+                <div class="flash-loan-info">
+                    Higher amounts may find more opportunities but require more liquidity
+                </div>
+                
+                <div class="gas-info">
+                    <span>Current Gas Price:</span>
+                    <span id="gasPrice">--</span>
+                </div>
+                <div class="slippage-control">
+                    <span>Slippage Tolerance:</span>
+                    <input type="number" id="slippageInput" class="slippage-input" value="1.0" min="0.1" max="50" step="0.1">%
                 </div>
             </div>
             
-            <div class="config-item">
-                <div class="config-label">Slippage Tolerance</div>
-                <input type="range" id="slippage" min="0.1" max="5" step="0.1" value="1.0" class="token-input">
-                <div class="token-input-row">
-                    <span>0.1%</span>
-                    <span id="slippageValue" class="reserve-value">1.0%</span>
-                    <span>5%</span>
+            <div class="progress-container">
+                <div class="progress-label">
+                    <span>Scan Progress</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar" id="scanProgress"></div>
                 </div>
             </div>
-            
-            <div class="config-item">
-                <div class="config-label">Minimum Profit Threshold</div>
-                <div class="reserve-value" id="minProfit">4.0%</div>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="profitBar" style="width: 70%;"></div>
-                </div>
-            </div>
-            
-            <div class="config-item">
-                <div class="config-label">Token Pair</div>
-                <select id="tokenPair" class="token-input">
-                    <option value="WBNB-BUSD">WBNB-BUSD</option>
-                    <option value="WBNB-USDT">WBNB-USDT</option>
-                    <option value="CAKE-BUSD">CAKE-BUSD</option>
-                    <option value="ETH-BTCB">ETH-BTCB</option>
-                    <option value="custom">Custom Pair</option>
-                </select>
-            </div>
-            
-            <div class="token-input-row" id="customPairInput" style="display:none;">
-                <div class="token-input-label">Custom Pair:</div>
-                <input type="text" class="token-input" id="customTokenA" placeholder="Token A address">
-                <input type="text" class="token-input" id="customTokenB" placeholder="Token B address">
-            </div>
-            
-            <button id="scanArbitrage" class="btn">
-                <i>🔍</i> Scan Arbitrage Opportunities
-            </button>
             
             <div class="status-container">
-                <div class="status-title">Scan Results</div>
-                <div id="scanResults">
-                    <div class="reserve-row">
-                        <span class="reserve-label">Status:</span>
-                        <span class="reserve-value">Ready to scan</span>
-                    </div>
-                    <div class="reserve-row">
-                        <span class="reserve-label">Opportunities Found:</span>
-                        <span class="reserve-value">0</span>
-                    </div>
-                    <div class="reserve-row">
-                        <span class="reserve-label">Estimated Gas:</span>
-                        <span class="reserve-value">-</span>
-                    </div>
-                    <div class="reserve-row">
-                        <span class="reserve-label">Max Profit:</span>
-                        <span class="reserve-value">-</span>
-                    </div>
-                </div>
+                <div id="result">[System] Welcome to Arbitrage Pro! Please connect your wallet to begin.</div>
+                <div class="spinner" id="loadingSpinner"></div>
             </div>
             
-            <button id="executeTrade" class="btn" style="background: var(--success); margin-top: 15px; display: none;">
-                <i>⚡</i> Execute Arbitrage Trade
-            </button>
+            <div class="debug-container" id="debugInfo">
+                <div class="simulation-title"><i class="fas fa-code"></i> Transaction Execution</div>
+                <div id="executionResult">No transaction data available</div>
+            </div>
             
-            <div class="logs-container" id="logs">
-                <div class="log-entry"><span class="log-timestamp">[10:23:45]</span> Arbitrage Bot initialized</div>
-                <div class="log-entry"><span class="log-timestamp">[10:23:46]</span> ethers.js library loaded</div>
-                <div class="log-entry"><span class="log-timestamp">[10:23:47]</span> Contract address set: 0x4673fb316EaD2f9a9C1C8A9b40484384d55360De</div>
+            <div class="warning">
+                <strong>Direct Execution:</strong> Transactions are executed directly without simulation. Gas fees will be charged for all execution attempts.
             </div>
         </div>
         
         <div class="card">
-            <h2><i>⚙️</i> Configuration & Status</h2>
+            <h2><i class="fas fa-cogs"></i> Configuration & Status</h2>
+            
             <div class="contract-section">
                 <div class="config-item">
-                    <div class="config-label">Current Contract</div>
-                    <div class="contract-address" id="contractAddress">0x4673fb316EaD2f9a9C1C8A9b40484384d55360De</div>
-                </div>
-                
-                <div class="config-item">
-                    <div class="config-label">Flash Loan Provider</div>
-                    <select id="dexProviderSelect" class="token-input">
-                        <option value="pancake">PancakeSwap (0.25% fee)</option>
-                        <option value="aave">Aave v3 (0.09% fee)</option>
-                    </select>
-                </div>
-                
-                <div class="config-item">
-                    <div class="config-label">Network Status</div>
-                    <div class="reserve-row">
-                        <span class="reserve-label">BNB Chain:</span>
-                        <span class="reserve-value success">Connected</span>
+                    <div class="config-label">Contract Address</div>
+                    <div class="contract-address">
+                        <span id="contractAddress">0x4673fb316EaD2f9a9C1C8A9b40484384d55360De</span>
+                        <button class="copy-btn" onclick="copyContractAddress()">
+                            <i class="fas fa-copy"></i>
+                        </button>
                     </div>
-                    <div class="reserve-row">
-                        <span class="reserve-label">Gas Price:</span>
-                        <span class="reserve-value">5.2 Gwei</span>
-                    </div>
-                    <div class="reserve-row">
-                        <span class="reserve-label">Block:</span>
-                        <span class="reserve-value">#32,886,451</span>
-                    </div>
+                    <div class="config-label">Checksum Verified</div>
+                    <div class="config-value success" id="checksumStatus">✅ Valid</div>
                 </div>
             </div>
             
-            <div class="section-title">Backtesting Tool</div>
+            <div class="config-grid">
+                <div class="config-item">
+                    <div class="config-label">Min Profit Threshold</div>
+                    <div class="config-value" id="minProfit">6%</div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">Network</div>
+                    <div class="config-value">BNB Chain</div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">Wallet Status</div>
+                    <div class="config-value" id="walletStatus">Not Connected</div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">Factory Version</div>
+                    <div class="config-value" id="factoryVersion">V2</div>
+                </div>
+            </div>
+
+            <div class="section-title"><i class="fas fa-random"></i> Manual Scan Paths</div>
+            <div id="combinationButtons" class="combo-buttons-grid">
+                <!-- Buttons will be dynamically inserted here -->
+            </div>
+
+            <!-- NEW: Backtesting Tool -->
+            <div class="section-title"><i class="fas fa-history"></i> Backtesting Tool</div>
             <div class="simulation-panel">
-                <div class="simulation-title">Historical Data Analysis</div>
+                <div class="simulation-title"><i class="fas fa-chart-bar"></i> Historical Data Analysis (Simulated)</div>
                 <div class="config-item">
                     <div class="config-label">Time Range</div>
                     <select id="backtestTimeRange" class="token-input">
@@ -516,39 +783,18 @@
                         <option value="168">Last 7 days</option>
                     </select>
                 </div>
-                
-                <div class="config-item">
-                    <div class="config-label">Token Pair</div>
-                    <select id="backtestTokenPair" class="token-input">
-                        <option value="WBNB-BUSD">WBNB-BUSD</option>
-                        <option value="WBNB-USDT">WBNB-USDT</option>
-                        <option value="CAKE-BUSD">CAKE-BUSD</option>
-                        <option value="ETH-BTCB">ETH-BTCB</option>
-                        <option value="custom">Custom Pair</option>
-                    </select>
-                </div>
-                
-                <div class="token-input-row" id="customPairInputBacktest" style="display:none;">
-                    <div class="token-input-label">Custom Pair:</div>
-                    <input type="text" class="token-input" id="customTokenABacktest" placeholder="Token A address">
-                    <input type="text" class="token-input" id="customTokenBBacktest" placeholder="Token B address">
-                </div>
-                
-                <button id="runBacktest" class="btn">
-                    <i>📊</i> Run Backtest
+                <button id="runBacktest" class="btn" style="width: 100%;">
+                    <i class="fas fa-play-circle"></i> Run Backtest
                 </button>
-                
-                <div id="backtestResults" class="status-container" style="margin-top:15px; display:none;">
-                    <div class="simulation-title">Backtest Results</div>
-                    <div id="backtestData"></div>
-                </div>
+                 <div id="backtestResults" class="simulation-result" style="display:none;"></div>
             </div>
-            
-            <div class="section-title">Multi-DEX Analysis</div>
+
+            <!-- NEW: Multi-DEX Analysis -->
+            <div class="section-title"><i class="fas fa-exchange-alt"></i> Multi-DEX Analysis</div>
             <div class="simulation-panel">
-                <div class="simulation-title">Compare Prices Across DEXs</div>
+                 <div class="simulation-title"><i class="fas fa-balance-scale"></i> Compare Prices Across DEXs (Simulated)</div>
                 <div class="token-input-row">
-                    <div class="token-input-label">Token:</div>
+                    <div class="token-input-label" style="min-width: 50px;">Token:</div>
                     <select id="dexTokenSelect" class="token-input">
                         <option value="WBNB">WBNB</option>
                         <option value="BUSD">BUSD</option>
@@ -558,42 +804,82 @@
                         <option value="BTCB">BTCB</option>
                     </select>
                 </div>
-                
-                <button id="comparePrices" class="btn">
-                    <i>🔍</i> Compare Prices
+                <button id="comparePrices" class="btn" style="width: 100%;">
+                    <i class="fas fa-search-dollar"></i> Compare Prices
                 </button>
-                
-                <div id="dexComparison" class="status-container" style="margin-top:15px; display:none;">
-                    <div class="simulation-title">Price Comparison Results</div>
-                    <div id="dexComparisonData"></div>
+                <div id="dexComparison" class="status-container" style="margin-top:15px; display:none; min-height: auto; max-height: 250px;">
                 </div>
+            </div>
+
+            <div class="controls" style="margin-top: 25px;">
+                <button id="viewContract">
+                    <i class="fas fa-file-contract"></i> View Contract on BscScan
+                </button>
             </div>
         </div>
     </div>
 
     <div class="fixed-bottom">
-        <div class="version">Arbitrage Bot v6.0 | Multi-DEX Support | Backtesting | Aave V3 Integration</div>
+        <div class="version">Arbitrage Pro v3.0 | Enhanced Edition</div>
     </div>
 
     <script>
         // ======================
-        // ENHANCED CONFIGURATION
+        // CONFIGURATION
         // ======================
-        const AAVE_CONTRACT_ADDRESS = "0x4673fb316EaD2f9a9C1C8A9b40484384d55360De"; 
-        const PANCAKE_CONTRACT_ADDRESS = "0x4673fb316EaD2f9a9C1C8A9b40484384d55360De";
-        let currentContract = PANCAKE_CONTRACT_ADDRESS;
-        let MIN_PROFIT_THRESHOLD = 4.0;
-        let FLASH_LOAN_AMOUNT = 1.0;
-        let SLIPPAGE_TOLERANCE = 1.0;
+        const RAW_CONTRACT_ADDRESS = "0x4673fb316EaD2f9a9C1C8A9b40484384d55360De"; 
+        const MIN_PROFIT_THRESHOLD = 6.0;
+        let FLASH_LOAN_AMOUNT = 1.0; 
+        let SLIPPAGE_TOLERANCE = 1.0; 
         const LIQUIDITY_SAFETY_FACTOR = 1.2;
 
-        // Aave V3 Integration
-        const AAVE_PROVIDER_ADDRESS = "0xff75B6da14FfbbfD355Daf7a2731456b3562Ba6D";
-        const AAVE_ABI = [
-            "function flashLoanSimple(address receiver, address asset, uint256 amount, bytes calldata params, uint16 referralCode) external"
+        // Function to convert to checksum address
+        function toChecksumAddress(address) {
+            try {
+                return ethers.utils.getAddress(address.toLowerCase());
+            } catch {
+                console.error("Invalid address:", address);
+                return null;
+            }
+        }
+
+        const CONTRACT_ABI = [
+            "function executeArbitrage(address,uint256,address[])",
+            "function owner() view returns (address)"
         ];
 
-        // Multi-DEX Configuration
+        const TOKENS = {
+            WBNB: { address: toChecksumAddress("0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c"), decimals: 18, symbol: 'WBNB' },
+            BUSD: { address: toChecksumAddress("0xe9e7cea3dedca5984780bafc599bd69add087d56"), decimals: 18, symbol: 'BUSD' },
+            USDT: { address: toChecksumAddress("0x55d398326f99059ff775485246999027b3197955"), decimals: 18, symbol: 'USDT' },
+            ETH:  { address: toChecksumAddress("0x2170ed0880ac9a755fd29b2688956bd959f933f8"), decimals: 18, symbol: 'ETH' },
+            BTCB: { address: toChecksumAddress("0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c"), decimals: 18, symbol: 'BTCB' },
+            CAKE: { address: toChecksumAddress("0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82"), decimals: 18, symbol: 'CAKE' },
+            LINK: { address: toChecksumAddress("0xf8a0bf9cf54bb92fb173938622107ae6a24aa565"), decimals: 18, symbol: 'LINK' },
+            DOT:  { address: toChecksumAddress("0x7083609fce4d1d8dc0c979aab8c869ea2c873402"), decimals: 18, symbol: 'DOT' },
+            MATIC:{ address: toChecksumAddress("0xcc42724c6683b7e57334c4e856f4c9965ed682bd"), decimals: 18, symbol: 'MATIC' },
+            SHIB: { address: toChecksumAddress("0x2859e4544c4bb03966803b044a93563bd2d0dd4d"), decimals: 18, symbol: 'SHIB' },
+            ADA:  { address: toChecksumAddress("0x3ee2200efb3400fabb9aacf31297cbdd1d435d47"), decimals: 18, symbol: 'ADA' },
+            DOGE: { address: toChecksumAddress("0xba2ae424d960c26247dd6c32edc70b295c744c43"), decimals: 8, symbol: 'DOGE' },
+        };
+        
+        const COMBINATION_PATHS = [
+            { name: "WBNB→ETH→BTCB", path: [TOKENS.WBNB, TOKENS.ETH, TOKENS.BTCB, TOKENS.WBNB] },
+            { name: "WBNB→CAKE→BUSD", path: [TOKENS.WBNB, TOKENS.CAKE, TOKENS.BUSD, TOKENS.WBNB] },
+            { name: "WBNB→LINK→ETH", path: [TOKENS.WBNB, TOKENS.LINK, TOKENS.ETH, TOKENS.WBNB] },
+            { name: "WBNB→MATIC→CAKE", path: [TOKENS.WBNB, TOKENS.MATIC, TOKENS.CAKE, TOKENS.WBNB] },
+            { name: "WBNB→DOT→LINK", path: [TOKENS.WBNB, TOKENS.DOT, TOKENS.LINK, TOKENS.WBNB] },
+            { name: "WBNB→ADA→MATIC", path: [TOKENS.WBNB, TOKENS.ADA, TOKENS.MATIC, TOKENS.WBNB] },
+            { name: "WBNB→SHIB→DOGE", path: [TOKENS.WBNB, TOKENS.SHIB, TOKENS.DOGE, TOKENS.WBNB] },
+            { name: "WBNB→BTCB→USDT", path: [TOKENS.WBNB, TOKENS.BTCB, TOKENS.USDT, TOKENS.WBNB] },
+            { name: "WBNB→CAKE→LINK", path: [TOKENS.WBNB, TOKENS.CAKE, TOKENS.LINK, TOKENS.WBNB] },
+            { name: "WBNB→ETH→USDT", path: [TOKENS.WBNB, TOKENS.ETH, TOKENS.USDT, TOKENS.WBNB] },
+        ];
+        
+        const FACTORY_ADDRESS = toChecksumAddress('0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73');
+        const FACTORY_ABI = ['function getPair(address,address) external view returns (address)'];
+
+        // NEW: DEX Routers for Multi-DEX comparison
         const DEX_ROUTERS = {
             PancakeSwap: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
             ApeSwap: "0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7",
@@ -601,305 +887,317 @@
             BiSwap: "0x3a6d8cA21D1CF76F653A67577FA0D27453350dD8"
         };
 
-        // Token definitions
-        const TOKENS = {
-            WBNB: {
-                symbol: "WBNB",
-                address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
-                decimals: 18
-            },
-            BUSD: {
-                symbol: "BUSD",
-                address: "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56",
-                decimals: 18
-            },
-            USDT: {
-                symbol: "USDT",
-                address: "0x55d398326f99059fF775485246999027B3197955",
-                decimals: 18
-            },
-            ETH: {
-                symbol: "ETH",
-                address: "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
-                decimals: 18
-            },
-            BTCB: {
-                symbol: "BTCB",
-                address: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
-                decimals: 18
-            },
-            CAKE: {
-                symbol: "CAKE",
-                address: "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82",
-                decimals: 18
-            }
-        };
+        // Global variables
+        let provider, signer, contract, walletAddress, factory;
+        let currentOpportunity = null;
+        let customOpportunity = null; // Removed custom path UI for simplicity, but keeping logic
+        let isAutoScanning = false;
+        let autoScanInterval;
 
-        // Initialize UI elements
-        document.addEventListener('DOMContentLoaded', function() {
-            // Set contract address display
-            document.getElementById('contractAddress').textContent = PANCAKE_CONTRACT_ADDRESS;
+        document.addEventListener('DOMContentLoaded', setupUI);
+
+        function setupUI() {
+            // Core functionality listeners
+            document.getElementById('connectWallet').addEventListener('click', connectWallet);
+            document.getElementById('scanAll').addEventListener('click', () => scanPaths(COMBINATION_PATHS));
+            document.getElementById('executeTrade').addEventListener('click', executeTrade);
+            document.getElementById('viewContract').addEventListener('click', viewContract);
+            document.getElementById('autoScanToggle').addEventListener('click', toggleAutoScanner);
+            document.getElementById('slippageInput').addEventListener('change', updateSlippage);
+            document.getElementById('flashLoanInput').addEventListener('change', updateFlashLoanAmount);
             
-            // Set up loan amount slider
-            const loanAmountSlider = document.getElementById('loanAmount');
-            const loanAmountValue = document.getElementById('loanAmountValue');
-            loanAmountSlider.addEventListener('input', function() {
-                loanAmountValue.textContent = this.value + ' BNB';
-                FLASH_LOAN_AMOUNT = parseFloat(this.value);
-            });
-            
-            // Set up slippage slider
-            const slippageSlider = document.getElementById('slippage');
-            const slippageValue = document.getElementById('slippageValue');
-            slippageSlider.addEventListener('input', function() {
-                slippageValue.textContent = this.value + '%';
-                SLIPPAGE_TOLERANCE = parseFloat(this.value);
-            });
-            
-            // Token pair selector
-            document.getElementById('tokenPair').addEventListener('change', function(e) {
-                document.getElementById('customPairInput').style.display = 
-                    e.target.value === 'custom' ? 'flex' : 'none';
-            });
-            
-            // Backtest token pair selector
-            document.getElementById('backtestTokenPair').addEventListener('change', function(e) {
-                document.getElementById('customPairInputBacktest').style.display = 
-                    e.target.value === 'custom' ? 'flex' : 'none';
-            });
-            
-            // Flash loan provider selector
-            document.getElementById('dexProviderSelect').addEventListener('change', function(e) {
-                if (e.target.value === 'aave') {
-                    currentContract = AAVE_CONTRACT_ADDRESS;
-                    MIN_PROFIT_THRESHOLD = 4.0;
-                    logMessage("Using Aave v3 flash loans (0.09% fee)");
-                    document.getElementById('minProfit').textContent = "4.0%";
-                    document.getElementById('profitBar').style.width = "70%";
-                } else {
-                    currentContract = PANCAKE_CONTRACT_ADDRESS;
-                    MIN_PROFIT_THRESHOLD = 6.0;
-                    logMessage("Using PancakeSwap flash loans (0.25% fee)");
-                    document.getElementById('minProfit').textContent = "6.0%";
-                    document.getElementById('profitBar').style.width = "80%";
-                }
-            });
-            
-            // Button event listeners
-            document.getElementById('scanArbitrage').addEventListener('click', scanArbitrageOpportunities);
+            // New feature listeners
             document.getElementById('runBacktest').addEventListener('click', runBacktest);
             document.getElementById('comparePrices').addEventListener('click', compareDexPrices);
+
+            const buttonsContainer = document.getElementById('combinationButtons');
+            buttonsContainer.innerHTML = '';
+            COMBINATION_PATHS.forEach((combo, index) => {
+                const button = document.createElement('button');
+                button.className = 'combo-button';
+                button.textContent = combo.name;
+                button.dataset.pathIndex = index;
+                button.addEventListener('click', () => scanPaths([COMBINATION_PATHS[index]]));
+                buttonsContainer.appendChild(button);
+            });
             
-            // Initial log
-            logMessage("Arbitrage Bot ready. Select parameters and click 'Scan Arbitrage Opportunities'");
-        });
+            const checksummedAddr = toChecksumAddress(RAW_CONTRACT_ADDRESS);
+            const isValid = ethers.utils.isAddress(checksummedAddr);
+            document.getElementById('checksumStatus').textContent = isValid ? '✅ Valid' : '❌ Invalid';
+            document.getElementById('checksumStatus').className = isValid ? 'success' : 'error';
+        }
         
-        // ====================
-        // CORE FUNCTIONALITIES
-        // ====================
+        function copyContractAddress() {
+            const address = document.getElementById('contractAddress').textContent;
+            navigator.clipboard.writeText(address).then(() => {
+                logMessage('Contract address copied to clipboard');
+            });
+        }
         
-        function logMessage(message, isError = false) {
-            const logs = document.getElementById('logs');
-            const timestamp = new Date().toLocaleTimeString();
-            const logEntry = document.createElement('div');
-            logEntry.className = 'log-entry';
-            logEntry.innerHTML = `<span class="log-timestamp">[${timestamp}]</span> ${message}`;
+        function updateSlippage(e) {
+            SLIPPAGE_TOLERANCE = parseFloat(e.target.value);
+            logMessage(`Slippage tolerance set to: ${SLIPPAGE_TOLERANCE}%`);
+        }
+        
+        function updateFlashLoanAmount(e) {
+            const newAmount = parseFloat(e.target.value);
+            if (newAmount >= 0.1 && newAmount <= 1000) {
+                FLASH_LOAN_AMOUNT = newAmount;
+                logMessage(`Flash loan amount set to: ${FLASH_LOAN_AMOUNT} BNB`);
+            } else {
+                logMessage(`Flash loan amount must be between 0.1 and 1000 BNB`, true);
+                e.target.value = FLASH_LOAN_AMOUNT;
+            }
+        }
+        
+        async function toggleAutoScanner() {
+            const autoScanBtn = document.getElementById('autoScanToggle');
+            isAutoScanning = !isAutoScanning;
+
+            if (isAutoScanning) {
+                autoScanBtn.innerHTML = '<i class="fas fa-stop-circle"></i> Stop Auto-Scan';
+                autoScanBtn.classList.add('active-scan');
+                logMessage('Auto-scanner started. Scanning every 30 seconds...');
+                scanPaths(COMBINATION_PATHS);
+                autoScanInterval = setInterval(() => scanPaths(COMBINATION_PATHS), 30000);
+                document.getElementById('scanAll').disabled = true;
+            } else {
+                autoScanBtn.innerHTML = '<i class="fas fa-robot"></i> Start Auto-Scan';
+                autoScanBtn.classList.remove('active-scan');
+                clearInterval(autoScanInterval);
+                logMessage('Auto-scanner stopped.');
+                document.getElementById('scanAll').disabled = false;
+            }
+        }
+
+        async function scanPaths(pathsToScan) {
+            if (!signer) return logMessage("Please connect wallet first.", true);
+
+            logMessage(`Scanning ${pathsToScan.length} path(s) with ${FLASH_LOAN_AMOUNT} BNB...`);
+            if (!isAutoScanning) document.getElementById('scanAll').disabled = true;
+            document.getElementById('executeTrade').disabled = true;
             
-            if (isError) {
-                logEntry.classList.add('error');
+            let bestOpportunity = { profit: -Infinity };
+            let pathsChecked = 0;
+
+            for (const combo of pathsToScan) {
+                const path = combo.path;
+                const pathSymbols = path.map(p => p.symbol);
+                
+                try {
+                    const amountIn = ethers.utils.parseUnits(FLASH_LOAN_AMOUNT.toString(), path[0].decimals);
+                    let amountOut = amountIn;
+                    
+                    for (let i = 0; i < path.length - 1; i++) {
+                         const reserves = await getReserves(path[i].address, path[i+1].address);
+                         if (!reserves) {
+                             throw new Error(`No liquidity pool for ${path[i].symbol}/${path[i+1].symbol}`);
+                         }
+                         amountOut = getAmountOut(amountOut, reserves.reserveA, reserves.reserveB);
+                    }
+                    
+                    const slippageFactor = (100 - SLIPPAGE_TOLERANCE) / 100;
+                    const minAmountOut = amountOut.mul(ethers.BigNumber.from(Math.floor(slippageFactor * 10000))).div(10000);
+                    const profit = minAmountOut.sub(amountIn);
+
+                    if (profit.gt(0)) {
+                        const profitPercentage = (profit.mul(10000).div(amountIn)).toNumber() / 100;
+                        if (profitPercentage > MIN_PROFIT_THRESHOLD) {
+                            if (profitPercentage > bestOpportunity.profit) {
+                                 bestOpportunity = {
+                                    profit: profitPercentage,
+                                    path: path.map(p => p.address),
+                                    pathSymbols: pathSymbols,
+                                    amountIn: amountIn,
+                                    profitAbs: profit,
+                                    minAmountOut: minAmountOut,
+                                    tokenIn: path[0]
+                                };
+                            }
+                        }
+                    }
+                } catch(e) { 
+                    logMessage(`Skipping path ${pathSymbols.join("->")}: ${e.message}`, true); 
+                }
+                pathsChecked++;
+                updateProgress((pathsChecked / pathsToScan.length) * 100);
             }
             
-            logs.appendChild(logEntry);
-            logs.scrollTop = logs.scrollHeight;
-        }
-        
-        function scanArbitrageOpportunities() {
-            logMessage("Scanning for arbitrage opportunities...");
-            document.getElementById('executeTrade').style.display = 'none';
+            if (bestOpportunity.profit > MIN_PROFIT_THRESHOLD) {
+                logMessage(`SUCCESS: New best opportunity found! Profit: ${bestOpportunity.profit.toFixed(2)}%`, false);
+                currentOpportunity = bestOpportunity;
+                document.getElementById('executeTrade').disabled = false;
+            } else if (pathsToScan.length > 1) {
+                logMessage("Scan complete. No new opportunities found above the threshold.", true);
+            }
             
-            // Simulate scanning process
-            setTimeout(() => {
-                const opportunities = Math.floor(Math.random() * 5);
-                const maxProfit = (Math.random() * 8 + 2).toFixed(2);
-                const gasEstimate = (0.002 + Math.random() * 0.003).toFixed(4);
-                
-                const scanResults = document.getElementById('scanResults');
-                scanResults.innerHTML = `
-                    <div class="reserve-row">
-                        <span class="reserve-label">Status:</span>
-                        <span class="reserve-value success">Scan completed</span>
-                    </div>
-                    <div class="reserve-row">
-                        <span class="reserve-label">Opportunities Found:</span>
-                        <span class="reserve-value">${opportunities}</span>
-                    </div>
-                    <div class="reserve-row">
-                        <span class="reserve-label">Estimated Gas:</span>
-                        <span class="reserve-value">${gasEstimate} BNB</span>
-                    </div>
-                    <div class="reserve-row">
-                        <span class="reserve-label">Max Profit:</span>
-                        <span class="reserve-value ${maxProfit > MIN_PROFIT_THRESHOLD ? 'success' : 'warning'}">${maxProfit}%</span>
-                    </div>
-                `;
-                
-                if (opportunities > 0 && maxProfit > MIN_PROFIT_THRESHOLD) {
-                    document.getElementById('executeTrade').style.display = 'block';
-                    logMessage(`Found profitable opportunity! Max profit: ${maxProfit}%`);
-                } else if (opportunities > 0) {
-                    logMessage("Opportunities found but below profit threshold", true);
-                } else {
-                    logMessage("No profitable arbitrage opportunities found", true);
-                }
-            }, 2000);
+            if (!isAutoScanning) document.getElementById('scanAll').disabled = false;
+        }
+
+        async function getReserves(tokenA, tokenB) {
+            const [token0, token1] = tokenA.toLowerCase() < tokenB.toLowerCase() ? [tokenA, tokenB] : [tokenB, tokenA];
+            const pairAddress = await factory.getPair(token0, token1);
+            if (pairAddress === ethers.constants.AddressZero) return null;
+            
+            const PAIR_ABI = ['function getReserves() external view returns (uint112,uint112,uint32)', 'function token0() external view returns (address)'];
+            const pair = new ethers.Contract(pairAddress, PAIR_ABI, provider);
+            const [[reserve0, reserve1], token0Address] = await Promise.all([pair.getReserves(), pair.token0()]);
+            
+            return token0Address.toLowerCase() === token0.toLowerCase() 
+                ? { reserveA: reserve0, reserveB: reserve1 }
+                : { reserveA: reserve1, reserveB: reserve0 };
         }
         
-        // Enhanced backtesting function
-        async function runBacktest() {
-            logMessage("Running backtest with historical data...");
-            document.getElementById('backtestResults').style.display = 'block';
-            document.getElementById('backtestData').innerHTML = '<div class="spinner"></div>';
+        function getAmountOut(amountIn, reserveIn, reserveOut) {
+            const amountInWithFee = amountIn.mul(9975);
+            const numerator = amountInWithFee.mul(reserveOut);
+            const denominator = reserveIn.mul(10000).add(amountInWithFee);
+            return numerator.div(denominator);
+        }
+
+        async function executeTrade() {
+            if (!currentOpportunity) return logMessage("No opportunity to execute.", true);
+            
+            logMessage(`Executing trade with path: ${currentOpportunity.pathSymbols.join(' → ')}`);
+            document.getElementById('executeTrade').disabled = true;
             
             try {
-                // Simulate fetching historical data
-                const timeRange = document.getElementById('backtestTimeRange').value;
-                const pair = document.getElementById('backtestTokenPair').value;
+                const verifiedPath = currentOpportunity.path.map(addr => toChecksumAddress(addr));
+                const gasPrice = await provider.getGasPrice();
+                document.getElementById('gasPrice').textContent = `${ethers.utils.formatUnits(gasPrice, 'gwei')} Gwei`;
                 
-                // Simulated historical data analysis
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                const tx = await contract.executeArbitrage(
+                    verifiedPath[0],
+                    currentOpportunity.amountIn,
+                    verifiedPath,
+                    { gasPrice, gasLimit: 500000 }
+                );
                 
-                const simulatedResults = {
-                    timePeriod: `${timeRange} hour${timeRange > 1 ? 's' : ''}`,
-                    opportunitiesFound: Math.floor(Math.random() * 50) + 10,
-                    avgProfit: (Math.random() * 5 + 2).toFixed(2),
-                    successRate: (Math.random() * 30 + 70).toFixed(1),
-                    bestPath: "WBNB → ETH → BTCB → WBNB",
-                    bestProfit: (Math.random() * 8 + 4).toFixed(2)
-                };
+                logMessage(`Transaction sent: ${tx.hash}`);
+                document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-hourglass-half"></i> Tx Sent: <a href="https://bscscan.com/tx/${tx.hash}" target="_blank" class="tx-link">${tx.hash}</a></div>`;
                 
-                const backtestHTML = `
-                    <div class="simulation-result sim-success">
-                        <div class="reserve-row">
-                            <span class="reserve-label">Time Period:</span>
-                            <span class="reserve-value">${simulatedResults.timePeriod}</span>
-                        </div>
-                        <div class="reserve-row">
-                            <span class="reserve-label">Opportunities Found:</span>
-                            <span class="reserve-value">${simulatedResults.opportunitiesFound}</span>
-                        </div>
-                        <div class="reserve-row">
-                            <span class="reserve-label">Average Profit:</span>
-                            <span class="reserve-value">${simulatedResults.avgProfit}%</span>
-                        </div>
-                        <div class="reserve-row">
-                            <span class="reserve-label">Success Rate:</span>
-                            <span class="reserve-value">${simulatedResults.successRate}%</span>
-                        </div>
-                        <div class="reserve-row">
-                            <span class="reserve-label">Most Profitable Path:</span>
-                            <span class="reserve-value">${simulatedResults.bestPath}</span>
-                        </div>
-                        <div class="reserve-row">
-                            <span class="reserve-label">Best Profit:</span>
-                            <span class="reserve-value">${simulatedResults.bestProfit}%</span>
-                        </div>
-                    </div>
-                    <div class="warning" style="margin-top:15px;">
-                        Based on historical data. Actual market conditions may vary.
-                    </div>
-                `;
-                
-                document.getElementById('backtestData').innerHTML = backtestHTML;
-                logMessage("Backtest completed successfully");
-                
+                const receipt = await tx.wait();
+                if (receipt.status === 1) {
+                    logMessage("SUCCESS: Arbitrage transaction confirmed!", false);
+                    document.getElementById('executionResult').innerHTML += `<div class="execution-status status-confirmed"><i class="fas fa-check-circle"></i> Tx Confirmed in block: ${receipt.blockNumber}</div>`;
+                } else {
+                    throw new Error("Transaction failed on-chain");
+                }
             } catch(e) {
-                logMessage(`Backtest failed: ${e.message}`, true);
-                document.getElementById('backtestData').innerHTML = `<div class="error">Backtest failed: ${e.message}</div>`;
+                logMessage(`Trade execution failed: ${e.message}`, true);
+                if (e.transactionHash) {
+                     document.getElementById('executionResult').innerHTML += `<div class="execution-status status-failed"><i class="fas fa-times-circle"></i> Tx Failed: <a href="https://bscscan.com/tx/${e.transactionHash}" target="_blank" class="tx-link">${e.transactionHash}</a></div>`;
+                }
+            } finally {
+                document.getElementById('executeTrade').disabled = false;
             }
         }
         
-        // Multi-DEX price comparison
+        async function connectWallet() {
+            if (!window.ethereum) return logMessage("MetaMask not detected.", true);
+            logMessage("Connecting wallet...");
+            try {
+                await window.ethereum.request({ method: 'eth_requestAccounts' });
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                const network = await provider.getNetwork();
+                if (network.chainId !== 56) return logMessage("Warning: Not on BNB Chain.", true);
+                
+                signer = provider.getSigner();
+                walletAddress = await signer.getAddress();
+                const checksummedContractAddress = toChecksumAddress(RAW_CONTRACT_ADDRESS);
+                contract = new ethers.Contract(checksummedContractAddress, CONTRACT_ABI, signer);
+                factory = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, provider);
+                
+                document.getElementById('walletStatus').textContent = "Connected";
+                document.getElementById('connectWallet').style.display = 'none';
+                document.getElementById('scanAll').disabled = false;
+                document.getElementById('autoScanToggle').disabled = false;
+                logMessage("Wallet connected successfully.", false);
+            } catch(e) {
+                logMessage(`Connection failed: ${e.message}`, true);
+            }
+        }
+        
+        function viewContract() {
+            window.open(`https://bscscan.com/address/${toChecksumAddress(RAW_CONTRACT_ADDRESS)}`, '_blank');
+        }
+
+        function logMessage(message, isError = false) {
+            const resultDiv = document.getElementById('result');
+            const timestamp = new Date().toLocaleTimeString();
+            const messageElem = document.createElement('div');
+            messageElem.textContent = `[${timestamp}] ${message}`;
+            messageElem.className = isError ? 'error' : (message.toLowerCase().includes('success') ? 'success' : 'info');
+            resultDiv.prepend(messageElem);
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('scanProgress').style.width = `${percent}%`;
+            document.getElementById('progressPercent').textContent = `${Math.round(percent)}%`;
+        }
+
+        // =================================
+        // NEW SIMULATED FUNCTIONS
+        // =================================
+        async function runBacktest() {
+            logMessage("Running backtest with historical data (simulation)...");
+            const backtestResultsEl = document.getElementById('backtestResults');
+            backtestResultsEl.style.display = 'block';
+            backtestResultsEl.innerHTML = '<div class="spinner" style="display:block; margin: 10px auto;"></div>';
+            
+            const timeRange = document.getElementById('backtestTimeRange').value;
+
+            await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate async fetch
+
+            const simulatedResults = {
+                opportunitiesFound: Math.floor(Math.random() * 50) + 10,
+                avgProfit: (Math.random() * 5 + 2).toFixed(2),
+                successRate: (Math.random() * 30 + 70).toFixed(1),
+            };
+
+            backtestResultsEl.innerHTML = `
+                <div class="sim-success">
+                    <div class="reserve-row"><span class="reserve-label">Opportunities Found:</span> <span class="reserve-value">${simulatedResults.opportunitiesFound}</span></div>
+                    <div class="reserve-row"><span class="reserve-label">Average Profit:</span> <span class="reserve-value">${simulatedResults.avgProfit}%</span></div>
+                    <div class="reserve-row"><span class="reserve-label">Est. Success Rate:</span> <span class="reserve-value">${simulatedResults.successRate}%</span></div>
+                </div>`;
+            logMessage(`Backtest for last ${timeRange}h completed.`);
+        }
+
         async function compareDexPrices() {
             const tokenSymbol = document.getElementById('dexTokenSelect').value;
-            const token = TOKENS[tokenSymbol];
-            if (!token) return logMessage("Invalid token selected", true);
+            logMessage(`Comparing ${tokenSymbol} prices across DEXs (simulation)...`);
             
-            logMessage(`Comparing ${token.symbol} prices across DEXs...`);
-            document.getElementById('dexComparison').style.display = 'block';
-            document.getElementById('dexComparisonData').innerHTML = '<div class="spinner"></div>';
+            const dexComparisonEl = document.getElementById('dexComparison');
+            dexComparisonEl.style.display = 'block';
+            dexComparisonEl.innerHTML = '<div class="spinner" style="display:block; margin: 10px auto;"></div>';
+
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            const basePrice = 300 + (Math.random() * 50);
+            let priceHTML = '';
             
-            try {
-                // Simulate fetching prices from different DEXs
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                
-                const basePrice = 300 + (Math.random() * 50);
-                const dexPrices = {
-                    PancakeSwap: (basePrice * (1 + Math.random() * 0.02)).toFixed(4),
-                    ApeSwap: (basePrice * (1 + Math.random() * 0.03)).toFixed(4),
-                    MDEX: (basePrice * (1 + Math.random() * 0.025)).toFixed(4),
-                    BiSwap: (basePrice * (1 + Math.random() * 0.015)).toFixed(4)
-                };
-                
-                // Find best and worst prices
-                let bestDex = '';
-                let bestPrice = 0;
-                let worstDex = '';
-                let worstPrice = Infinity;
-                
-                for (const [dex, price] of Object.entries(dexPrices)) {
-                    const priceNum = parseFloat(price);
-                    if (priceNum > bestPrice) {
-                        bestPrice = priceNum;
-                        bestDex = dex;
-                    }
-                    if (priceNum < worstPrice) {
-                        worstPrice = priceNum;
-                        worstDex = dex;
-                    }
-                }
-                
-                const priceDifference = ((bestPrice - worstPrice) / worstPrice * 100).toFixed(2);
-                
-                let priceHTML = '<div class="simulation-title">Current Prices</div>';
-                for (const [dex, price] of Object.entries(dexPrices)) {
-                    const isBest = dex === bestDex;
-                    const isWorst = dex === worstDex;
-                    const priceDiff = ((price - worstPrice) / worstPrice * 100).toFixed(2);
-                    
-                    priceHTML += `
+            const prices = Object.keys(DEX_ROUTERS).map(dex => ({
+                name: dex,
+                price: basePrice * (1 + (Math.random() - 0.5) * 0.02)
+            }));
+
+            prices.forEach(dex => {
+                priceHTML += `
                     <div class="dex-comparison-row">
                         <div class="dex-name">${dex}:</div>
-                        <div class="dex-price">${price} USD
-                            <span class="arb-opportunity ${priceDiff > 1 ? 'opportunity-good' : 'opportunity-low'}">
-                                ${priceDiff}%
-                            </span>
-                        </div>
+                        <div class="dex-price">${dex.price.toFixed(4)} USD</div>
                     </div>`;
-                }
-                
-                priceHTML += `
-                <div class="simulation-result ${priceDifference > 1 ? 'sim-success' : 'sim-failure'}" style="margin-top:15px;">
-                    <div class="reserve-row">
-                        <span class="reserve-label">Max Difference:</span>
-                        <span class="reserve-value">${priceDifference}%</span>
-                    </div>
-                    <div class="reserve-row">
-                        <span class="reserve-label">Arbitrage Opportunity:</span>
-                        <span class="reserve-value">${priceDifference > 1 ? 'Yes' : 'No'}</span>
-                    </div>
-                    <div class="reserve-row">
-                        <span class="reserve-label">Recommended Action:</span>
-                        <span class="reserve-value">Buy on ${worstDex}, Sell on ${bestDex}</span>
-                    </div>
-                </div>`;
-                
-                document.getElementById('dexComparisonData').innerHTML = priceHTML;
-                logMessage("DEX comparison completed");
-                
-            } catch(e) {
-                logMessage(`DEX comparison failed: ${e.message}`, true);
-                document.getElementById('dexComparisonData').innerHTML = `<div class="error">Comparison failed: ${e.message}</div>`;
-            }
+            });
+            
+            const best = prices.reduce((max, p) => p.price > max.price ? p : max, prices[0]);
+            const worst = prices.reduce((min, p) => p.price < min.price ? p : min, prices[0]);
+            const diff = ((best.price - worst.price) / worst.price * 100).toFixed(2);
+            
+            priceHTML += `<div class="reserve-row" style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 5px;"><span class="reserve-label">Max Difference:</span> <span class="reserve-value ${diff > 0.5 ? 'success' : 'warning'}">${diff}%</span></div>`;
+            
+            dexComparisonEl.innerHTML = priceHTML;
+            logMessage("DEX price comparison complete.");
         }
     </script>
 </body>
