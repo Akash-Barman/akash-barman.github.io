@@ -725,7 +725,7 @@
             </div>
             
             <div class="warning">
-                <strong>Direct Execution:</strong> Transactions are executed directly without simulation. Gas fees will be charged for all execution attempts.
+                <strong>Disclaimer:</strong> Arbitrage trading is high-risk. This tool does not guarantee profits. Gas fees will be charged for all execution attempts, successful or not.
             </div>
         </div>
         
@@ -820,7 +820,7 @@
     </div>
 
     <div class="fixed-bottom">
-        <div class="version">Arbitrage Pro v3.0 | Enhanced Edition</div>
+        <div class="version">Arbitrage Pro v3.2 | Gas Fee Estimation</div>
     </div>
 
     <script>
@@ -833,7 +833,6 @@
         let SLIPPAGE_TOLERANCE = 1.0; 
         const LIQUIDITY_SAFETY_FACTOR = 1.2;
 
-        // Function to convert to checksum address
         function toChecksumAddress(address) {
             try {
                 return ethers.utils.getAddress(address.toLowerCase());
@@ -878,8 +877,6 @@
         
         const FACTORY_ADDRESS = toChecksumAddress('0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73');
         const FACTORY_ABI = ['function getPair(address,address) external view returns (address)'];
-
-        // NEW: DEX Routers for Multi-DEX comparison
         const DEX_ROUTERS = {
             PancakeSwap: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
             ApeSwap: "0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7",
@@ -890,14 +887,12 @@
         // Global variables
         let provider, signer, contract, walletAddress, factory;
         let currentOpportunity = null;
-        let customOpportunity = null; // Removed custom path UI for simplicity, but keeping logic
         let isAutoScanning = false;
         let autoScanInterval;
 
         document.addEventListener('DOMContentLoaded', setupUI);
 
         function setupUI() {
-            // Core functionality listeners
             document.getElementById('connectWallet').addEventListener('click', connectWallet);
             document.getElementById('scanAll').addEventListener('click', () => scanPaths(COMBINATION_PATHS));
             document.getElementById('executeTrade').addEventListener('click', executeTrade);
@@ -905,8 +900,6 @@
             document.getElementById('autoScanToggle').addEventListener('click', toggleAutoScanner);
             document.getElementById('slippageInput').addEventListener('change', updateSlippage);
             document.getElementById('flashLoanInput').addEventListener('change', updateFlashLoanAmount);
-            
-            // New feature listeners
             document.getElementById('runBacktest').addEventListener('click', runBacktest);
             document.getElementById('comparePrices').addEventListener('click', compareDexPrices);
 
@@ -1057,39 +1050,87 @@
 
         async function executeTrade() {
             if (!currentOpportunity) return logMessage("No opportunity to execute.", true);
-            
-            logMessage(`Executing trade with path: ${currentOpportunity.pathSymbols.join(' → ')}`);
-            document.getElementById('executeTrade').disabled = true;
-            
+
+            logMessage(`Preparing to execute: ${currentOpportunity.pathSymbols.join(' → ')}`);
+            const executeBtn = document.getElementById('executeTrade');
+            executeBtn.disabled = true;
+            document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-cogs"></i> Estimating gas fee...</div>`;
+
             try {
                 const verifiedPath = currentOpportunity.path.map(addr => toChecksumAddress(addr));
                 const gasPrice = await provider.getGasPrice();
-                document.getElementById('gasPrice').textContent = `${ethers.utils.formatUnits(gasPrice, 'gwei')} Gwei`;
+                document.getElementById('gasPrice').textContent = `${parseFloat(ethers.utils.formatUnits(gasPrice, 'gwei')).toFixed(2)} Gwei`;
                 
+                // Estimate gas limit
+                const estimatedGasLimit = await contract.estimateGas.executeArbitrage(
+                    verifiedPath[0],
+                    currentOpportunity.amountIn,
+                    verifiedPath
+                );
+
+                // Add a 20% buffer to the gas limit to be safe
+                const gasLimit = estimatedGasLimit.mul(120).div(100); 
+                
+                // Calculate and display the total fee
+                const totalGasFee = gasPrice.mul(gasLimit);
+                const feeInBnb = ethers.utils.formatEther(totalGasFee);
+
+                logMessage(`Estimated network fee: ${feeInBnb} BNB. Please confirm in your wallet.`);
+                document.getElementById('executionResult').innerHTML = `
+                    <div class="execution-status status-pending">
+                        <i class="fas fa-fire"></i> Estimated Fee: <strong>${parseFloat(feeInBnb).toFixed(8)} BNB</strong>
+                    </div>
+                    <div class="execution-status status-pending" style="margin-top: 5px;">
+                        <i class="fas fa-wallet"></i> Waiting for wallet confirmation...
+                    </div>`;
+
+                // Send the actual transaction with the calculated gas limit
                 const tx = await contract.executeArbitrage(
                     verifiedPath[0],
                     currentOpportunity.amountIn,
                     verifiedPath,
-                    { gasPrice, gasLimit: 500000 }
+                    { gasPrice, gasLimit }
                 );
                 
-                logMessage(`Transaction sent: ${tx.hash}`);
+                logMessage(`Transaction sent with hash: ${tx.hash}`);
                 document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-hourglass-half"></i> Tx Sent: <a href="https://bscscan.com/tx/${tx.hash}" target="_blank" class="tx-link">${tx.hash}</a></div>`;
                 
                 const receipt = await tx.wait();
+                
+                const actualFee = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+
                 if (receipt.status === 1) {
                     logMessage("SUCCESS: Arbitrage transaction confirmed!", false);
-                    document.getElementById('executionResult').innerHTML += `<div class="execution-status status-confirmed"><i class="fas fa-check-circle"></i> Tx Confirmed in block: ${receipt.blockNumber}</div>`;
+                    document.getElementById('executionResult').innerHTML = `
+                        <div class="execution-status status-confirmed">
+                            <i class="fas fa-check-circle"></i> Tx Confirmed in block: ${receipt.blockNumber}
+                        </div>
+                         <div class="execution-status status-confirmed" style="margin-top: 5px;">
+                            <i class="fas fa-gas-pump"></i> Actual Fee Paid: ${ethers.utils.formatEther(actualFee)} BNB
+                        </div>
+                    `;
                 } else {
-                    throw new Error("Transaction failed on-chain");
+                    throw new Error(`Transaction failed on-chain with status 0. Hash: ${receipt.transactionHash}`);
                 }
             } catch(e) {
-                logMessage(`Trade execution failed: ${e.message}`, true);
+                let errorMessage = e.reason || e.message || 'An unknown error occurred.';
+                logMessage(`Trade execution failed: ${errorMessage}`, true);
+                
+                if (e.code === 'INSUFFICIENT_FUNDS') {
+                    errorMessage = '<strong>Execution Failed:</strong> Insufficient BNB balance for gas fees.';
+                } else if (e.code === 4001) { // User rejected transaction in wallet
+                    errorMessage = '<strong>Transaction Rejected:</strong> You rejected the transaction in your wallet.';
+                } else if (errorMessage.includes('execution reverted')) {
+                    errorMessage = `<strong>Execution Failed:</strong> The contract rejected the transaction. This usually means market conditions changed and the trade is no longer profitable.`;
+                }
+                
+                document.getElementById('executionResult').innerHTML = `<div class="execution-status status-failed"><i class="fas fa-times-circle"></i> ${errorMessage}</div>`;
+                
                 if (e.transactionHash) {
-                     document.getElementById('executionResult').innerHTML += `<div class="execution-status status-failed"><i class="fas fa-times-circle"></i> Tx Failed: <a href="https://bscscan.com/tx/${e.transactionHash}" target="_blank" class="tx-link">${e.transactionHash}</a></div>`;
+                    document.getElementById('executionResult').innerHTML += `<div class="execution-status status-failed">Tx Hash: <a href="https://bscscan.com/tx/${e.transactionHash}" target="_blank" class="tx-link">${e.transactionHash}</a></div>`;
                 }
             } finally {
-                document.getElementById('executeTrade').disabled = false;
+                executeBtn.disabled = false;
             }
         }
         
@@ -1137,7 +1178,7 @@
         }
 
         // =================================
-        // NEW SIMULATED FUNCTIONS
+        // SIMULATED FUNCTIONS (UNCHANGED)
         // =================================
         async function runBacktest() {
             logMessage("Running backtest with historical data (simulation)...");
@@ -1147,7 +1188,7 @@
             
             const timeRange = document.getElementById('backtestTimeRange').value;
 
-            await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate async fetch
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
             const simulatedResults = {
                 opportunitiesFound: Math.floor(Math.random() * 50) + 10,
