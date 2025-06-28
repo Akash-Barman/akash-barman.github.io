@@ -613,7 +613,6 @@
             font-size: 1rem;
         }
 
-        /* Styles for new features from INDEX2 */
         .dex-comparison-row {
             display: flex;
             align-items: center;
@@ -770,7 +769,6 @@
                 <!-- Buttons will be dynamically inserted here -->
             </div>
 
-            <!-- NEW: Backtesting Tool -->
             <div class="section-title"><i class="fas fa-history"></i> Backtesting Tool</div>
             <div class="simulation-panel">
                 <div class="simulation-title"><i class="fas fa-chart-bar"></i> Historical Data Analysis (Simulated)</div>
@@ -789,7 +787,6 @@
                  <div id="backtestResults" class="simulation-result" style="display:none;"></div>
             </div>
 
-            <!-- NEW: Multi-DEX Analysis -->
             <div class="section-title"><i class="fas fa-exchange-alt"></i> Multi-DEX Analysis</div>
             <div class="simulation-panel">
                  <div class="simulation-title"><i class="fas fa-balance-scale"></i> Compare Prices Across DEXs (Simulated)</div>
@@ -820,7 +817,7 @@
     </div>
 
     <div class="fixed-bottom">
-        <div class="version">Arbitrage Pro v3.2 | Gas Fee Estimation</div>
+        <div class="version">Arbitrage Pro v3.3 | Calculation Fix</div>
     </div>
 
     <script>
@@ -831,7 +828,6 @@
         const MIN_PROFIT_THRESHOLD = 6.0;
         let FLASH_LOAN_AMOUNT = 1.0; 
         let SLIPPAGE_TOLERANCE = 1.0; 
-        const LIQUIDITY_SAFETY_FACTOR = 1.2;
 
         function toChecksumAddress(address) {
             try {
@@ -963,6 +959,30 @@
             }
         }
 
+        async function getPairInfo(tokenA, tokenB) {
+            try {
+                const [sortedTokenA, sortedTokenB] = tokenA.toLowerCase() < tokenB.toLowerCase()
+                    ? [tokenA, tokenB]
+                    : [tokenB, tokenA];
+
+                const pairAddress = await factory.getPair(sortedTokenA, sortedTokenB);
+                if (pairAddress === ethers.constants.AddressZero) return null;
+
+                const PAIR_ABI = ['function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)', 'function token0() external view returns (address)'];
+                const pair = new ethers.Contract(pairAddress, PAIR_ABI, provider);
+
+                const [[reserve0, reserve1], token0] = await Promise.all([
+                    pair.getReserves(),
+                    pair.token0()
+                ]);
+
+                return { reserve0, reserve1, token0 };
+            } catch (e) {
+                console.error(`Could not get pair info for ${tokenA}/${tokenB}`, e);
+                return null;
+            }
+        }
+
         async function scanPaths(pathsToScan) {
             if (!signer) return logMessage("Please connect wallet first.", true);
 
@@ -982,11 +1002,18 @@
                     let amountOut = amountIn;
                     
                     for (let i = 0; i < path.length - 1; i++) {
-                         const reserves = await getReserves(path[i].address, path[i+1].address);
-                         if (!reserves) {
-                             throw new Error(`No liquidity pool for ${path[i].symbol}/${path[i+1].symbol}`);
-                         }
-                         amountOut = getAmountOut(amountOut, reserves.reserveA, reserves.reserveB);
+                        const tokenIn = path[i];
+                        const pairInfo = await getPairInfo(tokenIn.address, path[i+1].address);
+                        
+                        if (!pairInfo) {
+                            throw new Error(`No liquidity pool for ${tokenIn.symbol}/${path[i+1].symbol}`);
+                        }
+
+                        const [reserveIn, reserveOut] = tokenIn.address.toLowerCase() === pairInfo.token0.toLowerCase()
+                            ? [pairInfo.reserve0, pairInfo.reserve1]
+                            : [pairInfo.reserve1, pairInfo.reserve0];
+                        
+                        amountOut = getAmountOut(amountOut, reserveIn, reserveOut);
                     }
                     
                     const slippageFactor = (100 - SLIPPAGE_TOLERANCE) / 100;
@@ -1017,31 +1044,20 @@
             }
             
             if (bestOpportunity.profit > MIN_PROFIT_THRESHOLD) {
-                logMessage(`SUCCESS: New best opportunity found! Profit: ${bestOpportunity.profit.toFixed(2)}%`, false);
+                logMessage(`SUCCESS: New best opportunity found! Profit: ${bestOpportunity.profit.toFixed(4)}%`, false);
                 currentOpportunity = bestOpportunity;
                 document.getElementById('executeTrade').disabled = false;
             } else if (pathsToScan.length > 1) {
-                logMessage("Scan complete. No new opportunities found above the threshold.", true);
+                logMessage("Scan complete. No profitable opportunities found above the threshold.", true);
             }
             
             if (!isAutoScanning) document.getElementById('scanAll').disabled = false;
         }
-
-        async function getReserves(tokenA, tokenB) {
-            const [token0, token1] = tokenA.toLowerCase() < tokenB.toLowerCase() ? [tokenA, tokenB] : [tokenB, tokenA];
-            const pairAddress = await factory.getPair(token0, token1);
-            if (pairAddress === ethers.constants.AddressZero) return null;
-            
-            const PAIR_ABI = ['function getReserves() external view returns (uint112,uint112,uint32)', 'function token0() external view returns (address)'];
-            const pair = new ethers.Contract(pairAddress, PAIR_ABI, provider);
-            const [[reserve0, reserve1], token0Address] = await Promise.all([pair.getReserves(), pair.token0()]);
-            
-            return token0Address.toLowerCase() === token0.toLowerCase() 
-                ? { reserveA: reserve0, reserveB: reserve1 }
-                : { reserveA: reserve1, reserveB: reserve0 };
-        }
         
         function getAmountOut(amountIn, reserveIn, reserveOut) {
+            if (reserveIn.isZero() || reserveOut.isZero()) {
+                return ethers.BigNumber.from(0);
+            }
             const amountInWithFee = amountIn.mul(9975);
             const numerator = amountInWithFee.mul(reserveOut);
             const denominator = reserveIn.mul(10000).add(amountInWithFee);
@@ -1061,17 +1077,14 @@
                 const gasPrice = await provider.getGasPrice();
                 document.getElementById('gasPrice').textContent = `${parseFloat(ethers.utils.formatUnits(gasPrice, 'gwei')).toFixed(2)} Gwei`;
                 
-                // Estimate gas limit
                 const estimatedGasLimit = await contract.estimateGas.executeArbitrage(
                     verifiedPath[0],
                     currentOpportunity.amountIn,
                     verifiedPath
                 );
 
-                // Add a 20% buffer to the gas limit to be safe
                 const gasLimit = estimatedGasLimit.mul(120).div(100); 
                 
-                // Calculate and display the total fee
                 const totalGasFee = gasPrice.mul(gasLimit);
                 const feeInBnb = ethers.utils.formatEther(totalGasFee);
 
@@ -1084,7 +1097,6 @@
                         <i class="fas fa-wallet"></i> Waiting for wallet confirmation...
                     </div>`;
 
-                // Send the actual transaction with the calculated gas limit
                 const tx = await contract.executeArbitrage(
                     verifiedPath[0],
                     currentOpportunity.amountIn,
@@ -1118,7 +1130,7 @@
                 
                 if (e.code === 'INSUFFICIENT_FUNDS') {
                     errorMessage = '<strong>Execution Failed:</strong> Insufficient BNB balance for gas fees.';
-                } else if (e.code === 4001) { // User rejected transaction in wallet
+                } else if (e.code === 4001) {
                     errorMessage = '<strong>Transaction Rejected:</strong> You rejected the transaction in your wallet.';
                 } else if (errorMessage.includes('execution reverted')) {
                     errorMessage = `<strong>Execution Failed:</strong> The contract rejected the transaction. This usually means market conditions changed and the trade is no longer profitable.`;
