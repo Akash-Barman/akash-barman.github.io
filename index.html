@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arbitrage Pro | BNB Chain Trading Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #047857;
+            --secondary: #6EE7B7;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --dark: #1F2937;
+            --darker: #111827;
+            --light: #E5E7EB;
+            --gray: #9CA3AF;
+            --card-bg: linear-gradient(145deg, #1f2a37, #111827);
+            --border: rgba(156, 163, 175, 0.2);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        
+        body {
+            background: var(--darker);
+            color: var(--light);
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+            background-image: radial-gradient(circle at 10% 20%, rgba(31, 41, 55, 0.8) 0%, rgba(17, 24, 39, 1) 100%);
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        h1 {
+            color: var(--secondary);
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        
+        .logo-icon {
+            background: var(--primary);
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        .subtitle {
+            color: var(--gray);
+            font-size: 1.1rem;
+            max-width: 800px;
+            margin: 0 auto 25px;
+            font-weight: 400;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 25px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        @media (min-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(5px);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+        }
+        
+        .card h2 {
+            color: var(--secondary);
+            margin-top: 0;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .card h2 i {
+            font-size: 1.4rem;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        button {
+            background: linear-gradient(to right, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 14px 18px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+            text-align: center;
+        }
+
+        #connectWallet {
+            grid-column: 1 / -1;
+        }
+        
+        button.active-scan {
+            background: linear-gradient(to right, var(--success), #059669);
+        }
+        
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+            transition: 0.5s;
+            z-index: -1;
+        }
+        
+        button:hover::before {
+            left: 100%;
+        }
+        
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3);
+        }
+        
+        button:disabled {
+            background: #374151;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+        
+        button.secondary {
+            background: linear-gradient(to right, #8B5CF6, #7C3AED);
+        }
+        button.secondary:hover {
+            box-shadow: 0 5px 15px rgba(139, 92, 246, 0.3);
+        }
+        
+        .status-container {
+            background-color: rgba(31, 41, 55, 0.7);
+            border-radius: 12px;
+            padding: 20px;
+            min-height: 200px;
+            margin-top: 20px;
+            overflow-y: auto;
+            max-height: 400px;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            font-size: 0.95rem;
+            position: relative;
+            border: 1px solid var(--border);
+        }
+        
+        #result {
+            white-space: pre-wrap;
+            line-height: 1.8;
+        }
+        
+        .warning {
+            background-color: rgba(254, 226, 226, 0.1);
+            border-left: 4px solid var(--danger);
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 25px;
+            font-size: 0.9rem;
+        }
+        
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .config-item {
+            background: rgba(31, 41, 55, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        
+        .config-label {
+            font-size: 0.85rem;
+            color: var(--gray);
+            margin-bottom: 5px;
+        }
+        
+        .config-value {
+            font-weight: 600;
+            font-size: 1.1rem;
+            word-break: break-all;
+        }
+        
+        .progress-container {
+            margin: 25px 0;
+        }
+        
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: var(--gray);
+        }
+        
+        .progress {
+            height: 10px;
+            background: #374151;
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(110, 231, 183, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid var(--secondary);
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .success { color: var(--success); }
+        .error { color: var(--danger); }
+        .info { color: var(--secondary); }
+        
+        .opportunity-card {
+            background: rgba(31, 41, 55, 0.7);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            border: 1px solid var(--border);
+        }
+        
+        .token-row {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            gap: 10px;
+        }
+        
+        .token-info { flex: 1; }
+        .token-name { font-weight: bold; color: var(--secondary); }
+        .token-amount { font-size: 0.9rem; color: var(--gray); }
+        
+        .profit-badge {
+            background: var(--success);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+        
+        .section-title {
+            font-size: 1.2rem;
+            color: var(--secondary);
+            margin: 25px 0 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .contract-section {
+            background: rgba(31, 41, 55, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border: 1px solid var(--border);
+        }
+        
+        .combo-buttons-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .combo-button {
+            background: linear-gradient(to right, #374151, #4B5563);
+            padding: 10px;
+            font-size: 0.9rem;
+        }
+        .combo-button:hover {
+            box-shadow: 0 5px 15px rgba(110, 231, 183, 0.2);
+            background: linear-gradient(to right, var(--primary), var(--primary-dark));
+        }
+        
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .status-good {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+        }
+        .status-error {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+        }
+        .status-warning {
+            background-color: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+        }
+        .fixed-bottom {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--darker);
+            padding: 10px 20px;
+            border-top: 1px solid var(--border);
+            z-index: 100;
+        }
+        .version {
+            text-align: center;
+            color: var(--gray);
+            font-size: 0.85rem;
+        }
+        .address-info {
+            font-size: 0.9rem;
+            color: var(--secondary);
+            margin: 5px 0;
+            word-break: break-all;
+        }
+        .simulation-panel {
+            background: rgba(31, 41, 55, 0.7);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid var(--border);
+        }
+        .simulation-title {
+            font-weight: bold;
+            color: var(--secondary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .gas-info {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+        }
+        .slippage-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .slippage-input {
+            background: rgba(31, 41, 55, 0.5);
+            border: 1px solid var(--gray);
+            border-radius: 5px;
+            padding: 8px;
+            color: white;
+            width: 80px;
+        }
+        .debug-container {
+            background-color: rgba(31, 41, 55, 0.7);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+            overflow-y: auto;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+        .tx-link {
+            color: var(--secondary);
+            text-decoration: none;
+        }
+        .tx-link:hover {
+            text-decoration: underline;
+        }
+        .simulation-result {
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        .sim-success {
+            background-color: rgba(16, 185, 129, 0.15);
+            border-left: 4px solid var(--success);
+        }
+        .sim-failure {
+            background-color: rgba(239, 68, 68, 0.15);
+            border-left: 4px solid var(--danger);
+        }
+        .custom-path {
+            background: rgba(31, 41, 55, 0.7);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            border: 1px solid var(--border);
+        }
+        .token-input-row {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            gap: 10px;
+        }
+        .token-input-label {
+            min-width: 100px;
+            color: var(--secondary);
+            font-weight: 600;
+        }
+        .token-input {
+            flex: 1;
+            background: rgba(31, 41, 55, 0.5);
+            border: 1px solid var(--gray);
+            border-radius: 5px;
+            padding: 10px;
+            color: white;
+        }
+        .custom-path-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .custom-path-btn {
+            flex: 1;
+        }
+        .flash-loan-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .flash-loan-input {
+            background: rgba(31, 41, 55, 0.5);
+            border: 1px solid var(--gray);
+            border-radius: 5px;
+            padding: 8px;
+            color: white;
+            width: 100px;
+        }
+        .flash-loan-info {
+            font-size: 0.85rem;
+            color: var(--gray);
+            margin-top: 5px;
+        }
+        .liquidity-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 5px 0;
+        }
+        .liquidity-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .liquidity-good {
+            background-color: var(--success);
+        }
+        .liquidity-warning {
+            background-color: var(--warning);
+        }
+        .liquidity-critical {
+            background-color: var(--danger);
+        }
+        .liquidity-status {
+            font-size: 0.9rem;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+        .lq-good {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+        }
+        .lq-warning {
+            background-color: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+        }
+        .lq-critical {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+        }
+        .reserve-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            padding: 3px 0;
+        }
+        .reserve-label {
+            color: var(--gray);
+        }
+        .reserve-value {
+            font-weight: 600;
+        }
+        .execution-status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 0.9rem;
+        }
+        .status-pending {
+            background-color: rgba(110, 231, 183, 0.15);
+            border-left: 4px solid var(--secondary);
+        }
+        .status-confirmed {
+            background-color: rgba(16, 185, 129, 0.15);
+            border-left: 4px solid var(--success);
+        }
+        .status-failed {
+            background-color: rgba(239, 68, 68, 0.15);
+            border-left: 4px solid var(--danger);
+        }
+        
+        .contract-address {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(16, 185, 129, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            border: 1px solid var(--success);
+        }
+        
+        .copy-btn {
+            background: none;
+            border: none;
+            color: var(--secondary);
+            cursor: pointer;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <div class="logo-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <h1>Arbitrage Pro</h1>
+        </div>
+        <div class="subtitle">
+            Professional trading platform with direct execution and liquidity verification on BNB Chain
+        </div>
+        <div id="libraryStatus" class="success">Library status: <span class="status-badge status-good">ethers.js loaded</span></div>
+    </header>
+    
+    <div class="container">
+        <div class="card">
+            <h2><i class="fas fa-search"></i> Arbitrage Scanner</h2>
+            <div class="controls">
+                <button id="connectWallet">
+                    <i class="fas fa-wallet"></i> Connect Wallet
+                </button>
+                 <button id="scanAll" disabled>
+                    <i class="fas fa-search"></i> Scan All Combos
+                </button>
+                 <button id="autoScanToggle" disabled>
+                    <i class="fas fa-robot"></i> Start Auto-Scan
+                </button>
+                 <button id="executeTrade" disabled class="secondary">
+                    <i class="fas fa-bolt"></i> Execute Best Trade
+                </button>
+            </div>
+            
+            <div class="simulation-panel">
+                <div class="simulation-title"><i class="fas fa-cog"></i> Transaction Settings</div>
+                
+                <div class="flash-loan-control">
+                    <span>Flash Loan Amount:</span>
+                    <input type="number" id="flashLoanInput" class="flash-loan-input" value="1.0" min="0.1" max="1000" step="0.1">
+                    <span>BNB</span>
+                </div>
+                <div class="flash-loan-info">
+                    Higher amounts may find more opportunities but require more liquidity
+                </div>
+                
+                <div class="gas-info">
+                    <span>Current Gas Price:</span>
+                    <span id="gasPrice">--</span>
+                </div>
+                <div class="slippage-control">
+                    <span>Slippage Tolerance:</span>
+                    <input type="number" id="slippageInput" class="slippage-input" value="1.0" min="0.1" max="50" step="0.1">%
+                </div>
+            </div>
+            
+            <div class="progress-container">
+                <div class="progress-label">
+                    <span>Scan Progress</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar" id="scanProgress"></div>
+                </div>
+            </div>
+            
+            <div class="status-container">
+                <div id="result">[System] Welcome to Arbitrage Pro! Please connect your wallet to begin.</div>
+                <div class="spinner" id="loadingSpinner"></div>
+            </div>
+            
+            <div class="debug-container" id="debugInfo">
+                <div class="simulation-title"><i class="fas fa-code"></i> Transaction Execution</div>
+                <div id="executionResult">No transaction data available</div>
+            </div>
+            
+            <div class="warning">
+                <strong>Direct Execution:</strong> Transactions are executed directly without simulation. Gas fees will be charged for all execution attempts.
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2><i class="fas fa-cogs"></i> Configuration & Status</h2>
+            
+            <div class="contract-section">
+                <div class="config-item">
+                    <div class="config-label">Contract Address</div>
+                    <div class="contract-address">
+                        <span id="contractAddress">0xaF60720eEE56a51b7f684Df775160CcBf63e1072</span>
+                        <button class="copy-btn" onclick="copyContractAddress()">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="config-label">Checksum Verified</div>
+                    <div class="config-value success" id="checksumStatus">✅ Valid</div>
+                </div>
+            </div>
+            
+            <div class="config-grid">
+                <div class="config-item">
+                    <div class="config-label">Min Profit Threshold</div>
+                    <div class="config-value" id="minProfit">6%</div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">Network</div>
+                    <div class="config-value">BNB Chain</div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">Wallet Status</div>
+                    <div class="config-value" id="walletStatus">Not Connected</div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">Factory Version</div>
+                    <div class="config-value" id="factoryVersion">V2</div>
+                </div>
+            </div>
+
+            <div class="section-title"><i class="fas fa-random"></i> Manual Scan Paths</div>
+            <div id="combinationButtons" class="combo-buttons-grid">
+                <!-- Buttons will be dynamically inserted here -->
+            </div>
+            
+            <div class="custom-path">
+                <div class="section-title"><i class="fas fa-project-diagram"></i> Custom Token Path</div>
+                <p>Enter up to 4 token addresses for a custom arbitrage path</p>
+                
+                <div class="token-input-row">
+                    <div class="token-input-label">Token 1 (Start):</div>
+                    <input type="text" class="token-input" id="customToken1" placeholder="0x...">
+                </div>
+                
+                <div class="token-input-row">
+                    <div class="token-input-label">Token 2:</div>
+                    <input type="text" class="token-input" id="customToken2" placeholder="0x...">
+                </div>
+                
+                <div class="token-input-row">
+                    <div class="token-input-label">Token 3:</div>
+                    <input type="text" class="token-input" id="customToken3" placeholder="0x...">
+                </div>
+                
+                <div class="token-input-row">
+                    <div class="token-input-label">Token 4 (End):</div>
+                    <input type="text" class="token-input" id="customToken4" placeholder="0x...">
+                </div>
+                
+                <div class="custom-path-buttons">
+                    <button id="scanCustomPath" class="custom-path-btn">
+                        <i class="fas fa-search"></i> Scan Custom Path
+                    </button>
+                    <button id="executeCustomTrade" class="custom-path-btn secondary" disabled>
+                        <i class="fas fa-bolt"></i> Execute Custom Trade
+                    </button>
+                </div>
+            </div>
+            
+            <div class="section-title"><i class="fas fa-star"></i> Current Opportunity</div>
+            <div id="opportunitiesContainer">
+                <p id="noOpportunities" style="color: var(--gray);">Scan to find opportunities.</p>
+            </div>
+            
+            <div class="section-title"><i class="fas fa-tint"></i> Liquidity Verification</div>
+            <div id="liquidityStatus">
+                <p>No liquidity data available. Scan an opportunity first.</p>
+            </div>
+            
+            <div class="controls">
+                <button id="viewContract">
+                    <i class="fas fa-file-contract"></i> View Contract on BscScan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="fixed-bottom">
+        <div class="version">Arbitrage Pro v2.0 | Direct Execution | Liquidity-Verified | Professional Edition</div>
+    </div>
+
+    <script>
+        // ======================
+        // CONFIGURATION
+        // ======================
+        const RAW_CONTRACT_ADDRESS = "0xaF60720eEE56a51b7f684Df775160CcBf63e1072"; 
+        const MIN_PROFIT_THRESHOLD = 6.0;
+        let FLASH_LOAN_AMOUNT = 1.0; // Default flash loan amount
+        let SLIPPAGE_TOLERANCE = 1.0; // Default slippage tolerance
+        const LIQUIDITY_SAFETY_FACTOR = 1.2; // Require 20% more liquidity than needed
+
+        // Function to convert to checksum address
+        function toChecksumAddress(address) {
+            return ethers.utils.getAddress(address.toLowerCase());
+        }
+
+        // Correct contract ABI based on your Solidity contract
+        const CONTRACT_ABI = [
+            "function executeArbitrage(address,uint256,address[])",
+            "function owner() view returns (address)"
+        ];
+
+        // Token definitions with checksummed addresses
+        const TOKENS = {
+            WBNB: { address: toChecksumAddress("0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c"), decimals: 18, symbol: 'WBNB' },
+            BUSD: { address: toChecksumAddress("0xe9e7cea3dedca5984780bafc599bd69add087d56"), decimals: 18, symbol: 'BUSD' },
+            USDT: { address: toChecksumAddress("0x55d398326f99059ff775485246999027b3197955"), decimals: 18, symbol: 'USDT' },
+            ETH:  { address: toChecksumAddress("0x2170ed0880ac9a755fd29b2688956bd959f933f8"), decimals: 18, symbol: 'ETH' },
+            BTCB: { address: toChecksumAddress("0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c"), decimals: 18, symbol: 'BTCB' },
+            CAKE: { address: toChecksumAddress("0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82"), decimals: 18, symbol: 'CAKE' },
+            LINK: { address: toChecksumAddress("0xf8a0bf9cf54bb92fb173938622107ae6a24aa565"), decimals: 18, symbol: 'LINK' },
+            DOT:  { address: toChecksumAddress("0x7083609fce4d1d8dc0c979aab8c869ea2c873402"), decimals: 18, symbol: 'DOT' },
+            MATIC:{ address: toChecksumAddress("0xcc42724c6683b7e57334c4e856f4c9965ed682bd"), decimals: 18, symbol: 'MATIC' },
+            SHIB: { address: toChecksumAddress("0x2859e4544c4bb03966803b044a93563bd2d0dd4d"), decimals: 18, symbol: 'SHIB' },
+            ADA:  { address: toChecksumAddress("0x3ee2200efb3400fabb9aacf31297cbdd1d435d47"), decimals: 18, symbol: 'ADA' },
+            DOGE: { address: toChecksumAddress("0xba2ae424d960c26247dd6c32edc70b295c744c43"), decimals: 8, symbol: 'DOGE' },
+        };
+        
+        const COMBINATION_PATHS = [
+            { name: "WBNB→ETH→BTCB", path: [TOKENS.WBNB, TOKENS.ETH, TOKENS.BTCB, TOKENS.WBNB] },
+            { name: "WBNB→CAKE→BUSD", path: [TOKENS.WBNB, TOKENS.CAKE, TOKENS.BUSD, TOKENS.WBNB] },
+            { name: "WBNB→LINK→ETH", path: [TOKENS.WBNB, TOKENS.LINK, TOKENS.ETH, TOKENS.WBNB] },
+            { name: "WBNB→MATIC→CAKE", path: [TOKENS.WBNB, TOKENS.MATIC, TOKENS.CAKE, TOKENS.WBNB] },
+            { name: "WBNB→DOT→LINK", path: [TOKENS.WBNB, TOKENS.DOT, TOKENS.LINK, TOKENS.WBNB] },
+            { name: "WBNB→ADA→MATIC", path: [TOKENS.WBNB, TOKENS.ADA, TOKENS.MATIC, TOKENS.WBNB] },
+            { name: "WBNB→SHIB→DOGE", path: [TOKENS.WBNB, TOKENS.SHIB, TOKENS.DOGE, TOKENS.WBNB] },
+            { name: "WBNB→BTCB→USDT", path: [TOKENS.WBNB, TOKENS.BTCB, TOKENS.USDT, TOKENS.WBNB] },
+            { name: "WBNB→CAKE→LINK", path: [TOKENS.WBNB, TOKENS.CAKE, TOKENS.LINK, TOKENS.WBNB] },
+            { name: "WBNB→ETH→USDT", path: [TOKENS.WBNB, TOKENS.ETH, TOKENS.USDT, TOKENS.WBNB] },
+        ];
+        
+        // FIXED: Correct PancakeSwap V2 Factory Address (checksummed)
+        const FACTORY_ADDRESS = toChecksumAddress('0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73');
+        const FACTORY_ABI = ['function getPair(address,address) external view returns (address)'];
+
+        // Global variables for ethers instances
+        let provider, signer, contract, walletAddress, factory;
+        let currentOpportunity = null;
+        let customOpportunity = null;
+        let isAutoScanning = false;
+        let autoScanInterval;
+        let estimatedGas = null;
+        let liquidityStatus = [];
+
+        document.addEventListener('DOMContentLoaded', setupUI);
+
+        function setupUI() {
+            document.getElementById('connectWallet').addEventListener('click', connectWallet);
+            document.getElementById('scanAll').addEventListener('click', () => scanPaths(COMBINATION_PATHS));
+            document.getElementById('executeTrade').addEventListener('click', executeTrade);
+            document.getElementById('viewContract').addEventListener('click', viewContract);
+            document.getElementById('autoScanToggle').addEventListener('click', toggleAutoScanner);
+            document.getElementById('slippageInput').addEventListener('change', updateSlippage);
+            document.getElementById('flashLoanInput').addEventListener('change', updateFlashLoanAmount);
+            document.getElementById('scanCustomPath').addEventListener('click', scanCustomPath);
+            document.getElementById('executeCustomTrade').addEventListener('click', executeCustomTrade);
+            
+            const buttonsContainer = document.getElementById('combinationButtons');
+            buttonsContainer.innerHTML = '';
+            COMBINATION_PATHS.forEach((combo, index) => {
+                const button = document.createElement('button');
+                button.className = 'combo-button';
+                button.textContent = combo.name;
+                button.dataset.pathIndex = index;
+                button.addEventListener('click', () => scanPaths([COMBINATION_PATHS[index]]));
+                buttonsContainer.appendChild(button);
+            });
+            
+            // Verify checksum status
+            const isValid = ethers.utils.isAddress(toChecksumAddress(RAW_CONTRACT_ADDRESS));
+            document.getElementById('checksumStatus').textContent = isValid ? '✅ Valid' : '❌ Invalid';
+            document.getElementById('checksumStatus').className = isValid ? 'success' : 'error';
+        }
+        
+        function copyContractAddress() {
+            const address = document.getElementById('contractAddress').textContent;
+            navigator.clipboard.writeText(address);
+            logMessage('Contract address copied to clipboard');
+        }
+        
+        function updateSlippage(e) {
+            SLIPPAGE_TOLERANCE = parseFloat(e.target.value);
+            logMessage(`Slippage tolerance set to: ${SLIPPAGE_TOLERANCE}%`);
+        }
+        
+        function updateFlashLoanAmount(e) {
+            const newAmount = parseFloat(e.target.value);
+            if (newAmount >= 0.1 && newAmount <= 1000) {
+                FLASH_LOAN_AMOUNT = newAmount;
+                logMessage(`Flash loan amount set to: ${FLASH_LOAN_AMOUNT} BNB`);
+            } else {
+                logMessage(`Flash loan amount must be between 0.1 and 1000 BNB`, true);
+                // Reset to valid value
+                e.target.value = FLASH_LOAN_AMOUNT;
+            }
+        }
+        
+        async function toggleAutoScanner() {
+            const autoScanBtn = document.getElementById('autoScanToggle');
+            const scanAllBtn = document.getElementById('scanAll');
+            const comboBtns = document.querySelectorAll('.combo-button');
+
+            isAutoScanning = !isAutoScanning;
+
+            if (isAutoScanning) {
+                autoScanBtn.textContent = 'Stop Auto-Scan';
+                autoScanBtn.classList.add('active-scan');
+                logMessage('Auto-scanner started. Scanning every 30 seconds...');
+                scanPaths(COMBINATION_PATHS);
+                autoScanInterval = setInterval(() => scanPaths(COMBINATION_PATHS), 30000);
+                scanAllBtn.disabled = true;
+                comboBtns.forEach(btn => btn.disabled = true);
+            } else {
+                autoScanBtn.textContent = 'Start Auto-Scan';
+                autoScanBtn.classList.remove('active-scan');
+                clearInterval(autoScanInterval);
+                logMessage('Auto-scanner stopped.');
+                scanAllBtn.disabled = false;
+                comboBtns.forEach(btn => btn.disabled = false);
+            }
+        }
+
+        async function scanPaths(pathsToScan) {
+            if (!signer) return logMessage("Please connect wallet first.", true);
+
+            logMessage(`Scanning ${pathsToScan.length} path(s) with ${FLASH_LOAN_AMOUNT} BNB...`);
+            if (!isAutoScanning) document.getElementById('scanAll').disabled = true;
+            
+            document.getElementById('executeTrade').disabled = true;
+            liquidityStatus = [];
+            
+            let bestOpportunity = { profit: -Infinity };
+            let pathsChecked = 0;
+
+            for (const combo of pathsToScan) {
+                const path = combo.path;
+                const pathSymbols = path.map(p => p.symbol);
+                
+                try {
+                    // Use first token's decimals for amount calculation
+                    const amountIn = ethers.utils.parseUnits(FLASH_LOAN_AMOUNT.toString(), path[0].decimals);
+                    
+                    let amountOut = amountIn;
+                    let liquiditySufficient = true;
+                    const stepReserves = [];
+                    
+                    for (let i = 0; i < path.length - 1; i++) {
+                         const reserves = await getReserves(path[i].address, path[i+1].address);
+                         if (!reserves) {
+                             throw new Error(`No liquidity pool for ${path[i].symbol}/${path[i+1].symbol}`);
+                         }
+                         
+                         // Check liquidity adequacy with safety factor
+                         const requiredReserve = amountIn.mul(LIQUIDITY_SAFETY_FACTOR * 100).div(100);
+                         if (reserves.reserveA.lt(requiredReserve)) {
+                             liquiditySufficient = false;
+                             logMessage(`Insufficient liquidity for ${path[i].symbol} in ${path[i].symbol}/${path[i+1].symbol} pool`, true);
+                         }
+                         
+                         amountOut = getAmountOut(amountOut, reserves.reserveA, reserves.reserveB);
+                         stepReserves.push({
+                            tokenIn: path[i].symbol,
+                            tokenOut: path[i+1].symbol,
+                            reserveIn: reserves.reserveA,
+                            reserveOut: reserves.reserveB,
+                            amountIn: i === 0 ? amountIn : amountOut,
+                            liquidityStatus: reserves.reserveA.gte(requiredReserve) ? 'good' : 'critical'
+                         });
+                    }
+                    
+                    if (!liquiditySufficient) {
+                        throw new Error("Skipping due to insufficient liquidity");
+                    }
+                    
+                    // Apply slippage tolerance to the final amount
+                    const slippageFactor = (100 - SLIPPAGE_TOLERANCE) / 100;
+                    const minAmountOut = amountOut.mul(ethers.BigNumber.from(Math.floor(slippageFactor * 10000))).div(10000);
+                    
+                    const profit = minAmountOut.sub(amountIn);
+                    if (profit.gt(0)) {
+                        const profitPercentage = (profit.mul(10000).div(amountIn)).toNumber() / 100;
+                        
+                        // Verify minimum profit threshold
+                        if (profitPercentage > MIN_PROFIT_THRESHOLD) {
+                            if (profitPercentage > bestOpportunity.profit) {
+                                 bestOpportunity = {
+                                    profit: profitPercentage,
+                                    path: path.map(p => p.address),
+                                    pathSymbols: pathSymbols,
+                                    amountIn: amountIn,
+                                    profitAbs: profit,
+                                    minAmountOut: minAmountOut,
+                                    tokenIn: path[0],
+                                    isCustom: false,
+                                    reserves: stepReserves
+                                };
+                            }
+                        } else {
+                            logMessage(`Profit (${profitPercentage.toFixed(2)}%) below threshold`, true);
+                        }
+                    }
+                } catch(e) { 
+                    logMessage(`Skipping path ${pathSymbols.join("->")}: ${e.message}`, true); 
+                }
+                pathsChecked++;
+                updateProgress((pathsChecked / pathsToScan.length) * 100);
+            }
+            
+            if (bestOpportunity.profit > MIN_PROFIT_THRESHOLD) {
+                logMessage(`SUCCESS: New best opportunity found! Profit: ${bestOpportunity.profit.toFixed(2)}%`, false);
+                logMessage(`Accounting for ${SLIPPAGE_TOLERANCE}% slippage and liquidity verification`);
+                currentOpportunity = bestOpportunity;
+                displayOpportunity(bestOpportunity);
+                displayLiquidityStatus(bestOpportunity);
+                document.getElementById('executeTrade').disabled = false;
+            } else if (pathsToScan.length > 1) {
+                logMessage("Scan complete. No new opportunities found above the threshold.", true);
+            }
+            
+            if (!isAutoScanning) document.getElementById('scanAll').disabled = false;
+        }
+
+        async function scanCustomPath() {
+            if (!signer) return logMessage("Please connect wallet first.", true);
+            
+            // Get custom token addresses
+            const tokenAddresses = [
+                document.getElementById('customToken1').value.trim(),
+                document.getElementById('customToken2').value.trim(),
+                document.getElementById('customToken3').value.trim(),
+                document.getElementById('customToken4').value.trim()
+            ].filter(addr => addr.length > 0);
+            
+            // Validate input
+            if (tokenAddresses.length < 2) {
+                logMessage("Please enter at least 2 token addresses", true);
+                return;
+            }
+            
+            // Close the loop by adding the first token at the end
+            tokenAddresses.push(tokenAddresses[0]);
+            
+            logMessage(`Scanning custom path with ${tokenAddresses.length} tokens and ${FLASH_LOAN_AMOUNT} BNB flash loan...`);
+            liquidityStatus = [];
+            
+            try {
+                // Convert to token objects with symbol and decimals
+                const tokenPath = [];
+                for (const addr of tokenAddresses) {
+                    const checksumAddr = toChecksumAddress(addr);
+                    const token = await createTokenObject(checksumAddr);
+                    tokenPath.push(token);
+                }
+                
+                // Use first token's decimals for amount calculation
+                const amountIn = ethers.utils.parseUnits(FLASH_LOAN_AMOUNT.toString(), tokenPath[0].decimals);
+                
+                let amountOut = amountIn;
+                let liquiditySufficient = true;
+                const stepReserves = [];
+                
+                for (let i = 0; i < tokenPath.length - 1; i++) {
+                    const reserves = await getReserves(tokenPath[i].address, tokenPath[i+1].address);
+                    if (!reserves) {
+                        throw new Error(`No liquidity pool for ${tokenPath[i].symbol}/${tokenPath[i+1].symbol}`);
+                    }
+                    
+                    // Check liquidity adequacy with safety factor
+                    const requiredReserve = amountIn.mul(LIQUIDITY_SAFETY_FACTOR * 100).div(100);
+                    if (reserves.reserveA.lt(requiredReserve)) {
+                        liquiditySufficient = false;
+                        logMessage(`Insufficient liquidity for ${tokenPath[i].symbol} in ${tokenPath[i].symbol}/${tokenPath[i+1].symbol} pool`, true);
+                    }
+                    
+                    amountOut = getAmountOut(amountOut, reserves.reserveA, reserves.reserveB);
+                    stepReserves.push({
+                        tokenIn: tokenPath[i].symbol,
+                        tokenOut: tokenPath[i+1].symbol,
+                        reserveIn: reserves.reserveA,
+                        reserveOut: reserves.reserveB,
+                        amountIn: i === 0 ? amountIn : amountOut,
+                        liquidityStatus: reserves.reserveA.gte(requiredReserve) ? 'good' : 'critical'
+                    });
+                }
+                
+                if (!liquiditySufficient) {
+                    throw new Error("Skipping due to insufficient liquidity");
+                }
+                
+                // Apply slippage tolerance
+                const slippageFactor = (100 - SLIPPAGE_TOLERANCE) / 100;
+                const minAmountOut = amountOut.mul(ethers.BigNumber.from(Math.floor(slippageFactor * 10000))).div(10000);
+                
+                const profit = minAmountOut.sub(amountIn);
+                if (profit.gt(0)) {
+                    const profitPercentage = (profit.mul(10000).div(amountIn)).toNumber() / 100;
+                    
+                    if (profitPercentage > MIN_PROFIT_THRESHOLD) {
+                        customOpportunity = {
+                            profit: profitPercentage,
+                            path: tokenPath.map(p => p.address),
+                            pathSymbols: tokenPath.map(p => p.symbol),
+                            amountIn: amountIn,
+                            profitAbs: profit,
+                            minAmountOut: minAmountOut,
+                            tokenIn: tokenPath[0],
+                            isCustom: true,
+                            reserves: stepReserves
+                        };
+                        
+                        logMessage(`SUCCESS: Custom path profitable! Profit: ${profitPercentage.toFixed(2)}%`, false);
+                        displayOpportunity(customOpportunity);
+                        displayLiquidityStatus(customOpportunity);
+                        document.getElementById('executeCustomTrade').disabled = false;
+                    } else {
+                        logMessage(`Custom path profit (${profitPercentage.toFixed(2)}%) below threshold`, true);
+                    }
+                } else {
+                    logMessage("Custom path not profitable", true);
+                }
+            } catch(e) {
+                logMessage(`Custom path scan failed: ${e.message}`, true);
+            }
+        }
+        
+        function displayLiquidityStatus(opportunity) {
+            if (!opportunity || !opportunity.reserves) return;
+            
+            let html = `<div class="simulation-title"><i class="fas fa-tint"></i> Liquidity Verification</div>`;
+            
+            opportunity.reserves.forEach((step, index) => {
+                const reserveInFormatted = ethers.utils.formatUnits(step.reserveIn, 18);
+                const reserveOutFormatted = ethers.utils.formatUnits(step.reserveOut, 18);
+                const amountInFormatted = ethers.utils.formatUnits(step.amountIn, 18);
+                
+                let statusClass = 'lq-good';
+                let statusText = 'Sufficient';
+                if (step.liquidityStatus === 'critical') {
+                    statusClass = 'lq-critical';
+                    statusText = 'Insufficient';
+                }
+                
+                html += `
+                <div class="liquidity-status ${statusClass}">
+                    <div class="reserve-row">
+                        <span class="reserve-label">Step ${index+1}:</span>
+                        <span class="reserve-value">${step.tokenIn} → ${step.tokenOut}</span>
+                    </div>
+                    <div class="reserve-row">
+                        <span class="reserve-label">Reserve In:</span>
+                        <span class="reserve-value">${parseFloat(reserveInFormatted).toFixed(4)} ${step.tokenIn}</span>
+                    </div>
+                    <div class="reserve-row">
+                        <span class="reserve-label">Reserve Out:</span>
+                        <span class="reserve-value">${parseFloat(reserveOutFormatted).toFixed(4)} ${step.tokenOut}</span>
+                    </div>
+                    <div class="reserve-row">
+                        <span class="reserve-label">Required:</span>
+                        <span class="reserve-value">${parseFloat(amountInFormatted).toFixed(4)} ${step.tokenIn}</span>
+                    </div>
+                    <div class="reserve-row">
+                        <span class="reserve-label">Status:</span>
+                        <span class="reserve-value">${statusText} Liquidity</span>
+                    </div>
+                </div>`;
+            });
+            
+            document.getElementById('liquidityStatus').innerHTML = html;
+        }
+        
+        async function createTokenObject(address) {
+            // Check if token is in our known tokens
+            const knownToken = Object.values(TOKENS).find(t => t.address.toLowerCase() === address.toLowerCase());
+            if (knownToken) return knownToken;
+            
+            // Create custom token object
+            try {
+                const tokenContract = new ethers.Contract(address, [
+                    'function symbol() view returns (string)',
+                    'function decimals() view returns (uint8)'
+                ], provider);
+                
+                const [symbol, decimals] = await Promise.all([
+                    tokenContract.symbol(),
+                    tokenContract.decimals()
+                ]);
+                
+                return {
+                    address: toChecksumAddress(address),
+                    symbol: symbol,
+                    decimals: decimals
+                };
+            } catch(e) {
+                // Default values if we can't fetch
+                return {
+                    address: toChecksumAddress(address),
+                    symbol: address.substring(0,6) + '...',
+                    decimals: 18
+                };
+            }
+        }
+
+        function displayOpportunity(opportunity) {
+            const tokenSymbol = opportunity.tokenIn.symbol;
+            const loanAmount = ethers.utils.formatUnits(opportunity.amountIn, opportunity.tokenIn.decimals);
+            
+            const oppCard = `
+            <div class="opportunity-card">
+                <div class="token-row">
+                    <div class="token-info">
+                        <div class="token-name">${opportunity.pathSymbols.join(" → ")}</div>
+                        <div class="token-amount">Flash Loan: ${loanAmount.substring(0,8)} ${tokenSymbol}</div>
+                        <div class="token-amount">Est. Profit: ~${ethers.utils.formatUnits(opportunity.profitAbs, opportunity.tokenIn.decimals).substring(0,8)} ${tokenSymbol}</div>
+                        <div class="token-amount">Min. Expected: ${ethers.utils.formatUnits(opportunity.minAmountOut, opportunity.tokenIn.decimals).substring(0,8)} ${tokenSymbol}</div>
+                        <div class="token-amount">${opportunity.isCustom ? 'Custom Path' : 'Predefined Path'}</div>
+                    </div>
+                    <div class="profit-badge">${opportunity.profit.toFixed(2)}%</div>
+                </div>
+            </div>`;
+            document.getElementById('opportunitiesContainer').innerHTML = oppCard;
+        }
+        
+        async function getReserves(tokenA, tokenB) {
+            // Sort tokens to ensure consistent order (required by PancakeSwap)
+            const [token0, token1] = tokenA.toLowerCase() < tokenB.toLowerCase() 
+                ? [tokenA, tokenB] 
+                : [tokenB, tokenA];
+
+            let attempts = 0;
+            while(attempts < 3) {
+                try {
+                    const pairAddress = await factory.getPair(token0, token1);
+                    if (pairAddress === ethers.constants.AddressZero) {
+                        throw new Error('Liquidity pool does not exist');
+                    }
+                    
+                    const PAIR_ABI = ['function getReserves() external view returns (uint112,uint112,uint32)', 'function token0() external view returns (address)'];
+                    const pair = new ethers.Contract(pairAddress, PAIR_ABI, provider);
+                    const [reserve0, reserve1] = await pair.getReserves();
+                    const token0Address = await pair.token0();
+                    
+                    return token0Address.toLowerCase() === token0.toLowerCase() 
+                        ? { reserveA: reserve0, reserveB: reserve1 }
+                        : { reserveA: reserve1, reserveB: reserve0 };
+                } catch (e) {
+                    attempts++;
+                    if (attempts >= 3) {
+                        throw new Error(`Failed to get reserves after 3 attempts: ${e.message}`);
+                    }
+                    await new Promise(res => setTimeout(res, 500));
+                }
+            }
+            return null;
+        }
+        
+        function getAmountOut(amountIn, reserveIn, reserveOut) {
+            const amountInWithFee = amountIn.mul(9975);
+            const numerator = amountInWithFee.mul(reserveOut);
+            const denominator = reserveIn.mul(10000).add(amountInWithFee);
+            return numerator.div(denominator);
+        }
+
+        async function executeTrade() {
+            if (!currentOpportunity) return logMessage("No opportunity to execute.", true);
+            await executeOpportunity(currentOpportunity);
+        }
+        
+        async function executeCustomTrade() {
+            if (!customOpportunity) return logMessage("No custom opportunity to execute.", true);
+            await executeOpportunity(customOpportunity);
+        }
+        
+        async function executeOpportunity(opportunity) {
+            logMessage(`Preparing to execute trade with ${FLASH_LOAN_AMOUNT} BNB flash loan...`);
+            
+            // Verify all addresses in path are checksummed
+            const verifiedPath = opportunity.path.map(addr => {
+                if (!ethers.utils.isAddress(addr)) {
+                    throw new Error(`Invalid address in path: ${addr}`);
+                }
+                return ethers.utils.getAddress(addr);
+            });
+            
+            logMessage(`Executing trade with path: ${opportunity.pathSymbols.join(' → ')}`);
+            
+            const executeBtn = opportunity.isCustom 
+                ? document.getElementById('executeCustomTrade')
+                : document.getElementById('executeTrade');
+                
+            executeBtn.disabled = true;
+            
+            try {
+                // Recheck liquidity right before execution
+                logMessage("Rechecking liquidity...");
+                let liquiditySufficient = true;
+                
+                let amountIn = opportunity.amountIn;
+                for (let i = 0; i < opportunity.pathSymbols.length - 1; i++) {
+                    const reserves = await getReserves(verifiedPath[i], verifiedPath[i+1]);
+                    if (!reserves) {
+                        throw new Error(`Pool not found for step ${i+1}`);
+                    }
+                    
+                    // Check liquidity adequacy with safety factor
+                    const requiredReserve = amountIn.mul(LIQUIDITY_SAFETY_FACTOR * 100).div(100);
+                    if (reserves.reserveA.lt(requiredReserve)) {
+                        liquiditySufficient = false;
+                        logMessage(`CRITICAL: Insufficient liquidity for step ${i+1} (${opportunity.pathSymbols[i]}→${opportunity.pathSymbols[i+1]})`, true);
+                    }
+                    
+                    amountIn = getAmountOut(amountIn, reserves.reserveA, reserves.reserveB);
+                }
+                
+                if (!liquiditySufficient) {
+                    throw new Error("Aborting execution due to insufficient liquidity");
+                }
+                
+                // Get current gas price
+                const gasPrice = await provider.getGasPrice();
+                const gasPriceGwei = ethers.utils.formatUnits(gasPrice, 'gwei');
+                document.getElementById('gasPrice').textContent = `${parseFloat(gasPriceGwei).toFixed(2)} Gwei`;
+                
+                // Prepare transaction (CORRECTED to match contract interface)
+                const tx = await contract.executeArbitrage(
+                    verifiedPath[0],
+                    opportunity.amountIn,
+                    verifiedPath,
+                    { 
+                        gasPrice: gasPrice,
+                        gasLimit: 500000 // Fixed gas limit for execution
+                    }
+                );
+                
+                logMessage(`Transaction sent with hash: ${tx.hash}`);
+                
+                // Display transaction link
+                document.getElementById('executionResult').innerHTML = `
+                    <div class="execution-status status-pending">
+                        <i class="fas fa-hourglass-half"></i> Transaction sent: 
+                        <a href="https://bscscan.com/tx/${tx.hash}" target="_blank" class="tx-link">
+                            ${tx.hash.substring(0, 16)}...${tx.hash.substring(tx.hash.length - 10)}
+                        </a>
+                    </div>
+                `;
+                
+                // Wait for transaction confirmation
+                const receipt = await tx.wait();
+                
+                if (receipt.status === 1) {
+                    logMessage(`Transaction confirmed in block: ${receipt.blockNumber}`, false);
+                    logMessage("SUCCESS: Arbitrage transaction confirmed!", false);
+                    document.getElementById('executionResult').innerHTML += `
+                        <div class="execution-status status-confirmed">
+                            <i class="fas fa-check-circle"></i> Transaction confirmed in block: ${receipt.blockNumber}
+                        </div>
+                    `;
+                    
+                    // Show success message with profit details
+                    const profitAmount = ethers.utils.formatUnits(opportunity.profitAbs, opportunity.tokenIn.decimals);
+                    document.getElementById('executionResult').innerHTML += `
+                        <div class="execution-status status-confirmed">
+                            <i class="fas fa-coins"></i> Profit: ~${parseFloat(profitAmount).toFixed(6)} ${opportunity.tokenIn.symbol}
+                        </div>
+                    `;
+                } else {
+                    logMessage(`Transaction failed with status: ${receipt.status}`, true);
+                    document.getElementById('executionResult').innerHTML += `
+                        <div class="execution-status status-failed">
+                            <i class="fas fa-times-circle"></i> Transaction failed with status: ${receipt.status}
+                        </div>
+                    `;
+                    
+                    // Try to decode revert reason
+                    try {
+                        const code = await provider.call(tx, receipt.blockHash);
+                        const reason = ethers.utils.toUtf8String('0x' + code.substr(138));
+                        logMessage(`Revert reason: ${reason}`, true);
+                        document.getElementById('executionResult').innerHTML += `
+                            <div class="execution-status status-failed">
+                                <i class="fas fa-exclamation-triangle"></i> Revert reason: ${reason}
+                            </div>
+                        `;
+                    } catch (decodeError) {
+                        logMessage("Could not decode revert reason", true);
+                    }
+                }
+            } catch(e) {
+                let errorMessage = e.message;
+                if (e.reason) {
+                    errorMessage += ` (${e.reason})`;
+                }
+                if (e.transactionHash) {
+                    errorMessage += `\nTransaction hash: ${e.transactionHash}`;
+                    document.getElementById('executionResult').innerHTML += `
+                        <div class="execution-status status-failed">
+                            <i class="fas fa-times-circle"></i> Transaction failed: 
+                            <a href="https://bscscan.com/tx/${e.transactionHash}" target="_blank" class="tx-link">
+                                ${e.transactionHash.substring(0, 16)}...${e.transactionHash.substring(e.transactionHash.length - 10)}
+                            </a>
+                        </div>
+                    `;
+                }
+                if (e.data) {
+                    errorMessage += `\nError data: ${e.data}`;
+                }
+                logMessage(`Trade execution failed: ${errorMessage}`, true);
+            } finally {
+                executeBtn.disabled = false;
+            }
+        }
+        
+        async function connectWallet() {
+            if (!window.ethereum) return logMessage("MetaMask not detected. Please install MetaMask.", true);
+            logMessage("Connecting wallet...");
+            try {
+                await window.ethereum.request({ method: 'eth_requestAccounts' });
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                const network = await provider.getNetwork();
+                if (network.chainId !== 56) return logMessage(`Warning: Not on BNB Chain. Please switch networks.`, true);
+                signer = provider.getSigner();
+                walletAddress = await signer.getAddress();
+                
+                // Use checksummed contract address
+                const checksummedContractAddress = toChecksumAddress(RAW_CONTRACT_ADDRESS);
+                contract = new ethers.Contract(checksummedContractAddress, CONTRACT_ABI, signer);
+                
+                // Initialize PancakeSwap Factory contract
+                factory = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, provider);
+                
+                document.getElementById('walletStatus').textContent = "Connected";
+                document.getElementById('walletStatus').className = "success";
+                document.getElementById('connectWallet').style.display = 'none';
+                document.getElementById('scanAll').disabled = false;
+                document.getElementById('autoScanToggle').disabled = false;
+                document.querySelectorAll('.combo-button').forEach(btn => btn.disabled = false);
+                logMessage("Wallet connected successfully.", false);
+                logMessage(`Using contract: ${checksummedContractAddress}`);
+            } catch(e) {
+                logMessage(`Connection failed: ${e.message}`, true);
+            }
+        }
+        
+        function viewContract() {
+            window.open(`https://bscscan.com/address/${toChecksumAddress(RAW_CONTRACT_ADDRESS)}`, '_blank');
+        }
+
+        function logMessage(message, isError = false) {
+            const resultDiv = document.getElementById('result');
+            const timestamp = new Date().toLocaleTimeString();
+            const messageElem = document.createElement('div');
+            messageElem.textContent = `[${timestamp}] ${message}`;
+            messageElem.className = isError ? 'error' : (message.toLowerCase().includes('success') ? 'success' : 'info');
+            resultDiv.appendChild(messageElem);
+            resultDiv.scrollTop = resultDiv.scrollHeight;
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('scanProgress').style.width = `${percent}%`;
+            document.getElementById('progressPercent').textContent = `${Math.round(percent)}%`;
+        }
+
+    </script>
+</body>
+</html>
