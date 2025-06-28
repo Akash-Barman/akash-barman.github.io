@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitrage Pro | Dynamic Scanning Edition</title>
+    <title>Arbitrage Pro | Multi-DEX Scanning</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -169,7 +169,7 @@
         }
         
         button.active-scan, .btn.active-scan {
-            background: linear-gradient(to right, var(--success), #059669);
+            background: linear-gradient(to right, var(--danger), #991b1b);
         }
         
         button::before, .btn::before {
@@ -621,11 +621,12 @@
                 <div class="flash-loan-info">
                     Higher amounts may find more opportunities but require more liquidity
                 </div>
-                
-                <div class="gas-info">
-                    <span>Current Gas Price:</span>
-                    <span id="gasPrice">--</span>
+
+                <div class="slippage-control" style="margin-top: 15px;">
+                    <span>Min Profit %:</span>
+                    <input type="number" id="minProfitInput" class="slippage-input" value="6.0" min="0.1" max="100" step="0.1">
                 </div>
+                
                 <div class="slippage-control">
                     <span>Slippage Tolerance:</span>
                     <input type="number" id="slippageInput" class="slippage-input" value="1.0" min="0.1" max="50" step="0.1">%
@@ -676,8 +677,8 @@
             
             <div class="config-grid">
                 <div class="config-item">
-                    <div class="config-label">Min Profit Threshold</div>
-                    <div class="config-value" id="minProfit">6%</div>
+                    <div class="config-label">Gas Price</div>
+                    <div class="config-value" id="gasPriceDisplay">--</div>
                 </div>
                 <div class="config-item">
                     <div class="config-label">Network</div>
@@ -741,7 +742,7 @@
     </div>
 
     <div class="fixed-bottom">
-        <div class="version">Arbitrage Pro v3.4 | Dynamic Scanning</div>
+        <div class="version">Arbitrage Pro v3.5 | Multi-DEX Engine</div>
     </div>
 
     <script>
@@ -749,7 +750,7 @@
         // CONFIGURATION
         // ======================
         const RAW_CONTRACT_ADDRESS = "0x4673fb316EaD2f9a9C1C8A9b40484384d55360De"; 
-        const MIN_PROFIT_THRESHOLD = 6.0;
+        let MIN_PROFIT_THRESHOLD = 6.0;
         let FLASH_LOAN_AMOUNT = 1.0; 
         let SLIPPAGE_TOLERANCE = 1.0; 
 
@@ -763,7 +764,7 @@
         }
 
         const CONTRACT_ABI = [
-            "function executeArbitrage(address,uint256,address[])",
+            "function executeArbitrage(address,uint256,address[],address[])", // Updated ABI for multi-dex
             "function owner() view returns (address)"
         ];
 
@@ -775,39 +776,34 @@
             BTCB: { address: toChecksumAddress("0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c"), decimals: 18, symbol: 'BTCB' },
             CAKE: { address: toChecksumAddress("0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82"), decimals: 18, symbol: 'CAKE' },
             LINK: { address: toChecksumAddress("0xf8a0bf9cf54bb92fb173938622107ae6a24aa565"), decimals: 18, symbol: 'LINK' },
-            DOT:  { address: toChecksumAddress("0x7083609fce4d1d8dc0c979aab8c869ea2c873402"), decimals: 18, symbol: 'DOT' },
-            MATIC:{ address: toChecksumAddress("0xcc42724c6683b7e57334c4e856f4c9965ed682bd"), decimals: 18, symbol: 'MATIC' },
-            SHIB: { address: toChecksumAddress("0x2859e4544c4bb03966803b044a93563bd2d0dd4d"), decimals: 18, symbol: 'SHIB' },
-            ADA:  { address: toChecksumAddress("0x3ee2200efb3400fabb9aacf31297cbdd1d435d47"), decimals: 18, symbol: 'ADA' },
-            DOGE: { address: toChecksumAddress("0xba2ae424d960c26247dd6c32edc70b295c744c43"), decimals: 8, symbol: 'DOGE' },
+            DOT:  { address: toChecksumAddress("0x7083609fce4d1d8dc0c979aab8c869ea2c873402"), decimals: 18, symbol: 'DOT' }
         };
         
-        const FACTORY_ADDRESS = toChecksumAddress('0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73');
-        const FACTORY_ABI = ['function getPair(address,address) external view returns (address)'];
-        const DEX_ROUTERS = {
-            PancakeSwap: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
-            ApeSwap: "0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7",
-            MDEX: "0x7DAe51BD3E3376B8c7c4900E9107f12Be3AF1bA8",
-            BiSwap: "0x3a6d8cA21D1CF76F653A67577FA0D27453350dD8"
+        const DEXS = {
+            PancakeSwap: { factory: toChecksumAddress('0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73'), fee: 9975 },
+            ApeSwap: { factory: toChecksumAddress('0x0841BD0B734E4F5853f0dD8d7Ea041c241fb0Da6'), fee: 9980 }, // 0.2% fee
+            BiSwap: { factory: toChecksumAddress('0x858E3312ed3A876947EA49d572A7C42DE08af7EE'), fee: 9990 }  // 0.1% fee
         };
+        
+        const FACTORY_ABI = ['function getPair(address,address) external view returns (address)'];
 
-        let provider, signer, contract, walletAddress, factory;
+        let provider, signer, contract, walletAddress;
         let currentOpportunity = null;
         let isAutoScanning = false;
-        let autoScanInterval;
 
         document.addEventListener('DOMContentLoaded', setupUI);
 
         function setupUI() {
             document.getElementById('connectWallet').addEventListener('click', connectWallet);
             document.getElementById('scanAll').addEventListener('click', () => {
-                const allCombinations = generateAllCombinations();
-                scanPaths(allCombinations);
+                const allPaths = generateCrossDexPaths();
+                scanForOpportunities(allPaths);
             });
             document.getElementById('executeTrade').addEventListener('click', executeTrade);
             document.getElementById('viewContract').addEventListener('click', viewContract);
             document.getElementById('autoScanToggle').addEventListener('click', toggleAutoScanner);
             document.getElementById('slippageInput').addEventListener('change', updateSlippage);
+            document.getElementById('minProfitInput').addEventListener('change', updateMinProfit);
             document.getElementById('flashLoanInput').addEventListener('change', updateFlashLoanAmount);
             document.getElementById('runBacktest').addEventListener('click', runBacktest);
             document.getElementById('comparePrices').addEventListener('click', compareDexPrices);
@@ -829,6 +825,11 @@
             SLIPPAGE_TOLERANCE = parseFloat(e.target.value);
             logMessage(`Slippage tolerance set to: ${SLIPPAGE_TOLERANCE}%`);
         }
+
+        function updateMinProfit(e) {
+            MIN_PROFIT_THRESHOLD = parseFloat(e.target.value);
+            logMessage(`Minimum profit threshold set to: ${MIN_PROFIT_THRESHOLD}%`);
+        }
         
         function updateFlashLoanAmount(e) {
             const newAmount = parseFloat(e.target.value);
@@ -841,111 +842,130 @@
             }
         }
         
-        function toggleAutoScanner() {
+        async function toggleAutoScanner() {
             const autoScanBtn = document.getElementById('autoScanToggle');
+            const scanAllBtn = document.getElementById('scanAll');
             isAutoScanning = !isAutoScanning;
 
             if (isAutoScanning) {
-                autoScanBtn.innerHTML = '<i class="fas fa-stop-circle"></i> Stop Auto-Scan';
+                scanAllBtn.disabled = true;
+                autoScanBtn.innerHTML = '<i class="fas fa-stop-circle"></i> Stop Scan';
                 autoScanBtn.classList.add('active-scan');
-                const allCombinations = generateAllCombinations();
-                logMessage(`Auto-scanner started. Scanning ${allCombinations.length} paths every 30 seconds...`);
-                scanPaths(allCombinations);
-                autoScanInterval = setInterval(() => {
-                    const combinations = generateAllCombinations();
-                    scanPaths(combinations);
-                }, 30000);
-                document.getElementById('scanAll').disabled = true;
+                logMessage('Auto-scanner started. Searching for first profitable opportunity...');
+                
+                // This function will run in a loop until it finds something or is stopped
+                findFirstOpportunity();
             } else {
+                scanAllBtn.disabled = false;
                 autoScanBtn.innerHTML = '<i class="fas fa-robot"></i> Start Auto-Scan';
                 autoScanBtn.classList.remove('active-scan');
-                clearInterval(autoScanInterval);
                 logMessage('Auto-scanner stopped.');
-                document.getElementById('scanAll').disabled = false;
             }
         }
 
-        function generateAllCombinations() {
+        async function findFirstOpportunity() {
+            while (isAutoScanning) {
+                const allPaths = generateCrossDexPaths();
+                const opportunity = await scanForOpportunities(allPaths, true); // true = stopOnFirst
+                if (opportunity) {
+                    logMessage(`Opportunity found! Auto-scan stopped.`, false);
+                    toggleAutoScanner(); // This will set isAutoScanning to false and break the loop
+                    break;
+                }
+                if (isAutoScanning) {
+                    logMessage(`No opportunities found. Retrying in 5 seconds...`);
+                    await new Promise(res => setTimeout(res, 5000));
+                }
+            }
+        }
+
+        function generateCrossDexPaths() {
             const allTokens = Object.values(TOKENS);
             const baseToken = TOKENS.WBNB;
             const otherTokens = allTokens.filter(t => t.address.toLowerCase() !== baseToken.address.toLowerCase());
-            const combinations = [];
+            const dexKeys = Object.keys(DEXS);
+            const paths = [];
 
             for (let i = 0; i < otherTokens.length; i++) {
                 for (let j = 0; j < otherTokens.length; j++) {
-                    if (i === j) continue; // Skip A->A
+                    if (i === j) continue;
 
                     const tokenA = otherTokens[i];
                     const tokenB = otherTokens[j];
                     
-                    const path = [baseToken, tokenA, tokenB, baseToken];
-                    const name = `${baseToken.symbol}→${tokenA.symbol}→${tokenB.symbol}`;
-
-                    combinations.push({ name, path });
+                    // Iterate through all DEX combinations for the 2 swaps
+                    for (const dex1 of dexKeys) {
+                        for (const dex2 of dexKeys) {
+                            const path = {
+                                tokenPath: [baseToken, tokenA, tokenB, baseToken],
+                                dexPath: [dex1, dex2],
+                                name: `${baseToken.symbol} → ${tokenA.symbol} (${dex1}) → ${tokenB.symbol} (${dex2})`
+                            };
+                            paths.push(path);
+                        }
+                    }
                 }
             }
-            return combinations;
+            return paths;
         }
 
-        async function getPairInfo(tokenA, tokenB) {
+        async function getPairInfo(tokenA, tokenB, dexName) {
             try {
-                const [sortedTokenA, sortedTokenB] = tokenA.toLowerCase() < tokenB.toLowerCase()
-                    ? [tokenA, tokenB]
-                    : [tokenB, tokenA];
+                const dex = DEXS[dexName];
+                const factory = new ethers.Contract(dex.factory, FACTORY_ABI, provider);
+                const [sortedTokenA, sortedTokenB] = tokenA.toLowerCase() < tokenB.toLowerCase() ? [tokenA, tokenB] : [tokenB, tokenA];
 
                 const pairAddress = await factory.getPair(sortedTokenA, sortedTokenB);
                 if (pairAddress === ethers.constants.AddressZero) return null;
 
-                const PAIR_ABI = ['function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)', 'function token0() external view returns (address)'];
+                const PAIR_ABI = ['function getReserves() external view returns (uint112,uint112,uint32)', 'function token0() external view returns (address)'];
                 const pair = new ethers.Contract(pairAddress, PAIR_ABI, provider);
 
-                const [[reserve0, reserve1], token0] = await Promise.all([
-                    pair.getReserves(),
-                    pair.token0()
-                ]);
-
+                const [[reserve0, reserve1], token0] = await Promise.all([pair.getReserves(), pair.token0()]);
                 return { reserve0, reserve1, token0 };
             } catch (e) {
-                console.error(`Could not get pair info for ${tokenA}/${tokenB}`, e);
                 return null;
             }
         }
 
-        async function scanPaths(pathsToScan) {
+        async function scanForOpportunities(pathsToScan, stopOnFirst = false) {
             if (!signer) return logMessage("Please connect wallet first.", true);
 
-            logMessage(`Scanning ${pathsToScan.length} total possible paths with ${FLASH_LOAN_AMOUNT} BNB...`);
+            logMessage(`Scanning ${pathsToScan.length} total possible paths...`);
             if (!isAutoScanning) document.getElementById('scanAll').disabled = true;
             document.getElementById('executeTrade').disabled = true;
             
             let bestOpportunity = { profit: -Infinity };
             let pathsChecked = 0;
 
-            for (const combo of pathsToScan) {
-                const path = combo.path;
-                const pathSymbols = path.map(p => p.symbol);
+            for (const pathInfo of pathsToScan) {
+                if(stopOnFirst && bestOpportunity.profit > MIN_PROFIT_THRESHOLD) break;
+
+                const tokenPath = pathInfo.tokenPath;
+                const dexPath = pathInfo.dexPath;
+                const pathSymbols = tokenPath.map(p => p.symbol);
                 
                 try {
-                    const amountIn = ethers.utils.parseUnits(FLASH_LOAN_AMOUNT.toString(), path[0].decimals);
+                    const amountIn = ethers.utils.parseUnits(FLASH_LOAN_AMOUNT.toString(), tokenPath[0].decimals);
                     let amountOut = amountIn;
                     
-                    for (let i = 0; i < path.length - 1; i++) {
-                        const tokenIn = path[i];
-                        const pairInfo = await getPairInfo(tokenIn.address, path[i+1].address);
+                    for (let i = 0; i < dexPath.length; i++) {
+                        const tokenIn = tokenPath[i];
+                        const pairInfo = await getPairInfo(tokenIn.address, tokenPath[i+1].address, dexPath[i]);
                         
                         if (!pairInfo) {
-                            throw new Error(`No pool for ${tokenIn.symbol}/${path[i+1].symbol}`);
+                            throw new Error(`No pool on ${dexPath[i]}`);
                         }
 
                         const [reserveIn, reserveOut] = tokenIn.address.toLowerCase() === pairInfo.token0.toLowerCase()
                             ? [pairInfo.reserve0, pairInfo.reserve1]
                             : [pairInfo.reserve1, pairInfo.reserve0];
                         
-                        amountOut = getAmountOut(amountOut, reserveIn, reserveOut);
+                        amountOut = getAmountOut(amountOut, reserveIn, reserveOut, DEXS[dexPath[i]].fee);
                     }
                     
                     const slippageFactor = (100 - SLIPPAGE_TOLERANCE) / 100;
-                    const minAmountOut = amountOut.mul(ethers.BigNumber.from(Math.floor(slippageFactor * 10000))).div(10000);
+                    const minAmountOut = amountOut.mul(Math.floor(slippageFactor * 10000)).div(10000);
                     const profit = minAmountOut.sub(amountIn);
 
                     if (profit.gt(0)) {
@@ -954,42 +974,39 @@
                             if (profitPercentage > bestOpportunity.profit) {
                                  bestOpportunity = {
                                     profit: profitPercentage,
-                                    path: path.map(p => p.address),
+                                    path: tokenPath.map(p => p.address),
+                                    dexes: dexPath.map(d => DEXS[d].factory),
                                     pathSymbols: pathSymbols,
+                                    dexSymbols: dexPath,
                                     amountIn: amountIn,
                                     profitAbs: profit,
-                                    minAmountOut: minAmountOut,
-                                    tokenIn: path[0]
                                 };
                             }
                         }
                     }
-                } catch(e) { 
-                    // Do not log "No pool" errors to keep the log clean during a large scan
-                    if (!e.message.includes("No pool")) {
-                        logMessage(`Skipping path ${pathSymbols.join("->")}: ${e.message}`, true); 
-                    }
-                }
+                } catch(e) { /* Supress errors for clean logs */ }
+
                 pathsChecked++;
-                updateProgress((pathsChecked / pathsToScan.length) * 100);
+                if (!stopOnFirst) updateProgress((pathsChecked / pathsToScan.length) * 100);
             }
             
             if (bestOpportunity.profit > MIN_PROFIT_THRESHOLD) {
-                logMessage(`SUCCESS: New best opportunity found! Path: ${bestOpportunity.pathSymbols.join('→')} Profit: ${bestOpportunity.profit.toFixed(4)}%`, false);
+                const pathName = `${bestOpportunity.pathSymbols[0]} → ${bestOpportunity.pathSymbols[1]} (${bestOpportunity.dexSymbols[0]}) → ${bestOpportunity.pathSymbols[2]} (${bestOpportunity.dexSymbols[1]}) → ${bestOpportunity.pathSymbols[3]}`;
+                logMessage(`SUCCESS: New best opportunity found! Path: ${pathName} Profit: ${bestOpportunity.profit.toFixed(4)}%`, false);
                 currentOpportunity = bestOpportunity;
                 document.getElementById('executeTrade').disabled = false;
-            } else if (pathsToScan.length > 1) {
-                logMessage("Scan complete. No profitable opportunities found above the threshold.", true);
+                if(stopOnFirst) return bestOpportunity;
+            } else if (!stopOnFirst) {
+                logMessage("Scan complete. No profitable opportunities found.", true);
             }
             
             if (!isAutoScanning) document.getElementById('scanAll').disabled = false;
+            return null; // No opportunity found
         }
         
-        function getAmountOut(amountIn, reserveIn, reserveOut) {
-            if (reserveIn.isZero() || reserveOut.isZero()) {
-                return ethers.BigNumber.from(0);
-            }
-            const amountInWithFee = amountIn.mul(9975);
+        function getAmountOut(amountIn, reserveIn, reserveOut, fee) {
+            if (reserveIn.isZero() || reserveOut.isZero()) return ethers.BigNumber.from(0);
+            const amountInWithFee = amountIn.mul(fee);
             const numerator = amountInWithFee.mul(reserveOut);
             const denominator = reserveIn.mul(10000).add(amountInWithFee);
             return numerator.div(denominator);
@@ -997,21 +1014,22 @@
 
         async function executeTrade() {
             if (!currentOpportunity) return logMessage("No opportunity to execute.", true);
+            const pathName = `${currentOpportunity.pathSymbols[0]} → ${currentOpportunity.pathSymbols[1]} (${currentOpportunity.dexSymbols[0]}) → ${currentOpportunity.pathSymbols[2]} (${currentOpportunity.dexSymbols[1]}) → ${currentOpportunity.pathSymbols[3]}`;
 
-            logMessage(`Preparing to execute: ${currentOpportunity.pathSymbols.join(' → ')}`);
+            logMessage(`Preparing to execute: ${pathName}`);
             const executeBtn = document.getElementById('executeTrade');
             executeBtn.disabled = true;
             document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-cogs"></i> Estimating gas fee...</div>`;
 
             try {
-                const verifiedPath = currentOpportunity.path.map(addr => toChecksumAddress(addr));
                 const gasPrice = await provider.getGasPrice();
-                document.getElementById('gasPrice').textContent = `${parseFloat(ethers.utils.formatUnits(gasPrice, 'gwei')).toFixed(2)} Gwei`;
+                document.getElementById('gasPriceDisplay').textContent = `${parseFloat(ethers.utils.formatUnits(gasPrice, 'gwei')).toFixed(2)} Gwei`;
                 
                 const estimatedGasLimit = await contract.estimateGas.executeArbitrage(
-                    verifiedPath[0],
+                    currentOpportunity.path[0],
                     currentOpportunity.amountIn,
-                    verifiedPath
+                    currentOpportunity.path,
+                    currentOpportunity.dexes
                 );
 
                 const gasLimit = estimatedGasLimit.mul(120).div(100); 
@@ -1028,9 +1046,10 @@
                     </div>`;
 
                 const tx = await contract.executeArbitrage(
-                    verifiedPath[0],
+                    currentOpportunity.path[0],
                     currentOpportunity.amountIn,
-                    verifiedPath,
+                    currentOpportunity.path,
+                    currentOpportunity.dexes,
                     { gasPrice, gasLimit }
                 );
                 
@@ -1042,34 +1061,18 @@
 
                 if (receipt.status === 1) {
                     logMessage("SUCCESS: Arbitrage transaction confirmed!", false);
-                    document.getElementById('executionResult').innerHTML = `
-                        <div class="execution-status status-confirmed">
-                            <i class="fas fa-check-circle"></i> Tx Confirmed in block: ${receipt.blockNumber}
-                        </div>
-                         <div class="execution-status status-confirmed" style="margin-top: 5px;">
-                            <i class="fas fa-gas-pump"></i> Actual Fee Paid: ${ethers.utils.formatEther(actualFee)} BNB
-                        </div>
-                    `;
+                    document.getElementById('executionResult').innerHTML = `<div class="execution-status status-confirmed"><i class="fas fa-check-circle"></i> Tx Confirmed in block: ${receipt.blockNumber}</div><div class="execution-status status-confirmed" style="margin-top: 5px;"><i class="fas fa-gas-pump"></i> Actual Fee Paid: ${ethers.utils.formatEther(actualFee)} BNB</div>`;
                 } else {
                     throw new Error(`Transaction failed on-chain with status 0. Hash: ${receipt.transactionHash}`);
                 }
             } catch(e) {
                 let errorMessage = e.reason || e.message || 'An unknown error occurred.';
                 logMessage(`Trade execution failed: ${errorMessage}`, true);
-                
-                if (e.code === 'INSUFFICIENT_FUNDS') {
-                    errorMessage = '<strong>Execution Failed:</strong> Insufficient BNB balance for gas fees.';
-                } else if (e.code === 4001) {
-                    errorMessage = '<strong>Transaction Rejected:</strong> You rejected the transaction in your wallet.';
-                } else if (errorMessage.includes('execution reverted')) {
-                    errorMessage = `<strong>Execution Failed:</strong> The contract rejected the transaction. This usually means market conditions changed and the trade is no longer profitable.`;
-                }
-                
+                if (e.code === 'INSUFFICIENT_FUNDS') errorMessage = '<strong>Execution Failed:</strong> Insufficient BNB balance for gas fees.';
+                else if (e.code === 4001) errorMessage = '<strong>Transaction Rejected:</strong> You rejected the transaction in your wallet.';
+                else if (errorMessage.includes('execution reverted')) errorMessage = `<strong>Execution Failed:</strong> The contract rejected the transaction. This usually means market conditions changed and the trade is no longer profitable.`;
                 document.getElementById('executionResult').innerHTML = `<div class="execution-status status-failed"><i class="fas fa-times-circle"></i> ${errorMessage}</div>`;
-                
-                if (e.transactionHash) {
-                    document.getElementById('executionResult').innerHTML += `<div class="execution-status status-failed">Tx Hash: <a href="https://bscscan.com/tx/${e.transactionHash}" target="_blank" class="tx-link">${e.transactionHash}</a></div>`;
-                }
+                if (e.transactionHash) document.getElementById('executionResult').innerHTML += `<div class="execution-status status-failed">Tx Hash: <a href="https://bscscan.com/tx/${e.transactionHash}" target="_blank" class="tx-link">${e.transactionHash}</a></div>`;
             } finally {
                 executeBtn.disabled = false;
             }
@@ -1088,7 +1091,6 @@
                 walletAddress = await signer.getAddress();
                 const checksummedContractAddress = toChecksumAddress(RAW_CONTRACT_ADDRESS);
                 contract = new ethers.Contract(checksummedContractAddress, CONTRACT_ABI, signer);
-                factory = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, provider);
                 
                 document.getElementById('walletStatus').textContent = "Connected";
                 document.getElementById('connectWallet').style.display = 'none';
@@ -1134,12 +1136,7 @@
                 avgProfit: (Math.random() * 5 + 2).toFixed(2),
                 successRate: (Math.random() * 30 + 70).toFixed(1),
             };
-            backtestResultsEl.innerHTML = `
-                <div class="sim-success">
-                    <div class="reserve-row"><span class="reserve-label">Opportunities Found:</span> <span class="reserve-value">${simulatedResults.opportunitiesFound}</span></div>
-                    <div class="reserve-row"><span class="reserve-label">Average Profit:</span> <span class="reserve-value">${simulatedResults.avgProfit}%</span></div>
-                    <div class="reserve-row"><span class="reserve-label">Est. Success Rate:</span> <span class="reserve-value">${simulatedResults.successRate}%</span></div>
-                </div>`;
+            backtestResultsEl.innerHTML = `<div class="sim-success"><div class="reserve-row"><span class="reserve-label">Opportunities Found:</span> <span class="reserve-value">${simulatedResults.opportunitiesFound}</span></div><div class="reserve-row"><span class="reserve-label">Average Profit:</span> <span class="reserve-value">${simulatedResults.avgProfit}%</span></div><div class="reserve-row"><span class="reserve-label">Est. Success Rate:</span> <span class="reserve-value">${simulatedResults.successRate}%</span></div></div>`;
             logMessage(`Backtest for last ${timeRange}h completed.`);
         }
 
@@ -1155,17 +1152,14 @@
             const basePrice = 300 + (Math.random() * 50);
             let priceHTML = '';
             
-            const prices = Object.keys(DEX_ROUTERS).map(dex => ({
+            const dexKeys = Object.keys(DEXS);
+            const prices = dexKeys.map(dex => ({
                 name: dex,
                 price: basePrice * (1 + (Math.random() - 0.5) * 0.02)
             }));
 
             prices.forEach(dex => {
-                priceHTML += `
-                    <div class="dex-comparison-row">
-                        <div class="dex-name">${dex}:</div>
-                        <div class="dex-price">${dex.price.toFixed(4)} USD</div>
-                    </div>`;
+                priceHTML += `<div class="dex-comparison-row"><div class="dex-name">${dex.name}:</div><div class="dex-price">${dex.price.toFixed(4)} USD</div></div>`;
             });
             
             const best = prices.reduce((max, p) => p.price > max.price ? p : max, prices[0]);
