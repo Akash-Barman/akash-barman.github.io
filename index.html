@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitrage Pro | Massive Path Expansion</title>
+    <title>Arbitrage Pro | Audible Alerts</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -743,7 +744,7 @@
     </div>
 
     <div class="fixed-bottom">
-        <div class="version">Arbitrage Pro v4.1 | Adaptive AI Engine</div>
+        <div class="version">Arbitrage Pro v4.2 | Adaptive AI Engine</div>
     </div>
 
     <script>
@@ -791,6 +792,8 @@
         let isAutoScanning = false;
         let isManualScanning = false;
         let failedScanCycles = 0;
+        let alertOscillator = null;
+        let alertInterval = null;
 
         document.addEventListener('DOMContentLoaded', setupUI);
 
@@ -811,6 +814,33 @@
             document.getElementById('checksumStatus').textContent = checksummedAddr ? '✅ Valid' : '❌ Invalid';
             document.getElementById('checksumStatus').className = checksummedAddr ? 'success' : 'error';
         }
+
+        function startAlert() {
+            if (alertInterval) return; // Already alerting
+            if (!alertOscillator) {
+                alertOscillator = new Tone.Oscillator({
+                    type: "square",
+                    frequency: "C5",
+                    volume: -12
+                }).toDestination();
+            }
+            if (Tone.context.state !== 'running') {
+                Tone.start();
+            }
+            alertInterval = setInterval(() => {
+                alertOscillator.start().stop("+0.1");
+            }, 400);
+        }
+
+        function stopAlert() {
+            if (alertInterval) {
+                clearInterval(alertInterval);
+                alertInterval = null;
+                if(alertOscillator && alertOscillator.state === "started") {
+                    alertOscillator.stop();
+                }
+            }
+        }
         
         function stopAutoScan(wasCancelledByUser) {
              isAutoScanning = false;
@@ -820,6 +850,7 @@
              autoScanBtn.innerHTML = '<i class="fas fa-robot"></i> Start Auto-Scan';
              autoScanBtn.classList.remove('active-scan');
              if(wasCancelledByUser) logMessage('Auto-scanner stopped.');
+             stopAlert();
         }
 
         function toggleAutoScanner() {
@@ -860,6 +891,7 @@
                 if (opportunity) {
                     logMessage(`Opportunity found! Auto-scan stopped.`, false);
                     stopAutoScan(false);
+                    startAlert();
                     break;
                 }
                 
@@ -881,6 +913,7 @@
             const dexKeys = Object.keys(DEXS);
             const paths = [];
 
+            // 3-hop paths (WBNB -> A -> B -> WBNB)
             for (const tokenA of otherTokens) {
                 for (const tokenB of otherTokens) {
                     if (tokenA.address === tokenB.address) continue;
@@ -914,6 +947,7 @@
                  return null;
             }
 
+            stopAlert();
             isManualScanning = !stopOnFirst;
             logMessage(`Scanning ${pathsToScan.length} total possible paths... (This may take a while)`);
             if (!isAutoScanning) document.getElementById('scanAll').disabled = true;
@@ -926,18 +960,16 @@
                     const amountIn = ethers.utils.parseUnits(FLASH_LOAN_AMOUNT.toString(), pathInfo.tokenPath[0].decimals);
                     
                     let currentAmount = amountIn;
-                    // Note: This logic assumes a 3-hop path for simplicity of the check. The generator creates 3-hop paths.
                     const pathSegment1 = [pathInfo.tokenPath[0], pathInfo.tokenPath[1]];
-                    const pathSegment2 = [pathInfo.tokenPath[1], pathInfo.tokenPath[2]];
-                    const pathSegment3 = [pathInfo.tokenPath[2], pathInfo.tokenPath[3]];
-
                     currentAmount = await getAmountOutFromRouter(currentAmount, pathSegment1, pathInfo.dexRouters[0]);
                     if (currentAmount.isZero()) return null;
 
+                    const pathSegment2 = [pathInfo.tokenPath[1], pathInfo.tokenPath[2]];
                     currentAmount = await getAmountOutFromRouter(currentAmount, pathSegment2, pathInfo.dexRouters[1]);
                     if (currentAmount.isZero()) return null;
 
-                    let finalAmountOut = await getAmountOutFromRouter(currentAmount, pathSegment3, DEXS.PancakeSwap.router); // Repay on PancakeSwap
+                    const pathSegment3 = [pathInfo.tokenPath[2], pathInfo.tokenPath[3]];
+                    let finalAmountOut = await getAmountOutFromRouter(currentAmount, pathSegment3, DEXS.PancakeSwap.router);
                     if (finalAmountOut.isZero()) return null;
 
                     const slippageFactor = (100 - SLIPPAGE_TOLERANCE) / 100;
@@ -979,6 +1011,7 @@
                 logMessage(`SUCCESS: New best opportunity found! Path: ${bestOpportunity.name} Profit: ${bestOpportunity.profit.toFixed(4)}%`, false);
                 currentOpportunity = bestOpportunity;
                 document.getElementById('executeTrade').disabled = false;
+                startAlert();
                 if (stopOnFirst) return bestOpportunity;
             } else if (!stopOnFirst) {
                 logMessage("Scan complete. No profitable opportunities found.", false, true);
@@ -993,6 +1026,7 @@
 
         async function executeTrade() {
             if (!currentOpportunity) return logMessage("No opportunity to execute.", true);
+            stopAlert();
             logMessage(`Preparing to execute: ${currentOpportunity.name}`);
             const executeBtn = document.getElementById('executeTrade');
             executeBtn.disabled = true;
