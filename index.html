@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitrage Pro | Audible Alerts</title>
+    <title>Arbitrage Pro | Massive Path Expansion</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -775,6 +775,9 @@
             LTC:  { address: toChecksumAddress("0x4338665cbb7b2485a8855a139b75d5e34ab0db94"), decimals: 18, symbol: 'LTC'  },
             TRX:  { address: toChecksumAddress("0x85eac5ac2f758618dfa0926797919861b2714a51"), decimals: 18, symbol: 'TRX'  },
             UNI:  { address: toChecksumAddress("0xbf5140a255dc56728e6024e4e8bf83238d23e387"), decimals: 18, symbol: 'UNI'  },
+            SOL:  { address: toChecksumAddress("0x570a5d26f7765ecb712c0924e4de545b89fd43df"), decimals: 18, symbol: 'SOL'  },
+            AVAX: { address: toChecksumAddress("0x1ce0c2827e2ef14d5c4f29a091d735a204794041"), decimals: 18, symbol: 'AVAX' },
+            FTM:  { address: toChecksumAddress("0xad29abb318791d579433d831ed122afeaf29dcfe"), decimals: 18, symbol: 'FTM'  }
         };
         
         const DEXS = {
@@ -816,7 +819,7 @@
         }
 
         function startAlert() {
-            if (alertInterval) return; // Already alerting
+            if (alertInterval) return;
             if (!alertOscillator) {
                 alertOscillator = new Tone.Oscillator({
                     type: "square",
