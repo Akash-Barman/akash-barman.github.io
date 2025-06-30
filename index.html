@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitrage Pro | Massive Path Expansion</title>
+    <title>Arbitrage Pro | Auto-Execution Engine</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -229,8 +229,9 @@
         }
         
         .warning {
-            background-color: rgba(254, 226, 226, 0.1);
-            border-left: 4px solid var(--danger);
+            background-color: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
             padding: 15px;
             border-radius: 4px;
             margin-top: 25px;
@@ -633,6 +634,14 @@
                     <span>Slippage Tolerance:</span>
                     <input type="number" id="slippageInput" class="slippage-input" value="1.0" min="0.1" max="50" step="0.1">%
                 </div>
+
+                <div class="slippage-control" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+                    <span class="config-label" style="color: var(--warning);">Auto-Execute Trade</span>
+                    <input type="checkbox" id="autoExecuteToggle" style="width: 20px; height: 20px; cursor: pointer;">
+                </div>
+                <div id="autoExecuteWarning" class="warning" style="display: none; margin-top: 10px;">
+                    <strong>EXTREME RISK:</strong> When enabled, this bot will automatically send transactions and spend your gas fees without asking for confirmation. Use with caution.
+                </div>
             </div>
             
             <div class="progress-container">
@@ -653,10 +662,6 @@
             <div class="debug-container" id="debugInfo">
                 <div class="simulation-title"><i class="fas fa-code"></i> Transaction Execution</div>
                 <div id="executionResult">No transaction data available</div>
-            </div>
-            
-            <div class="warning">
-                <strong>Disclaimer:</strong> Arbitrage trading is high-risk. This tool does not guarantee profits. Gas fees will be charged for all execution attempts, successful or not.
             </div>
         </div>
         
@@ -744,7 +749,7 @@
     </div>
 
     <div class="fixed-bottom">
-        <div class="version">Arbitrage Pro v4.2 | Adaptive AI Engine</div>
+        <div class="version">Arbitrage Pro v4.3 | Auto-Execution Engine</div>
     </div>
 
     <script>
@@ -806,12 +811,21 @@
                 const allPaths = generateAllPaths();
                 scanForOpportunities(allPaths);
             });
-            document.getElementById('executeTrade').addEventListener('click', executeTrade);
+            document.getElementById('executeTrade').addEventListener('click', () => executeTrade(currentOpportunity));
             document.getElementById('viewContract').addEventListener('click', viewContract);
             document.getElementById('autoScanToggle').addEventListener('click', toggleAutoScanner);
             document.getElementById('slippageInput').addEventListener('change', (e) => { SLIPPAGE_TOLERANCE = parseFloat(e.target.value); logMessage(`Slippage set to ${SLIPPAGE_TOLERANCE}%`); });
             document.getElementById('minProfitInput').addEventListener('change', (e) => { MIN_PROFIT_THRESHOLD = parseFloat(e.target.value); logMessage(`Min Profit set to ${MIN_PROFIT_THRESHOLD}%`); });
             document.getElementById('flashLoanInput').addEventListener('change', (e) => { FLASH_LOAN_AMOUNT = parseFloat(e.target.value); logMessage(`Flash Loan set to ${FLASH_LOAN_AMOUNT} BNB`); });
+            document.getElementById('autoExecuteToggle').addEventListener('change', (e) => {
+                const isEnabled = e.target.checked;
+                document.getElementById('autoExecuteWarning').style.display = isEnabled ? 'block' : 'none';
+                if (isEnabled) {
+                    logMessage('Auto-Execute Enabled. WARNING: Bot will now send transactions automatically.', true);
+                } else {
+                    logMessage('Auto-Execute Disabled.');
+                }
+            });
             
             const checksummedAddr = toChecksumAddress(RAW_CONTRACT_ADDRESS);
             document.getElementById('checksumStatus').textContent = checksummedAddr ? '✅ Valid' : '❌ Invalid';
@@ -821,11 +835,7 @@
         function startAlert() {
             if (alertInterval) return;
             if (!alertOscillator) {
-                alertOscillator = new Tone.Oscillator({
-                    type: "square",
-                    frequency: "C5",
-                    volume: -12
-                }).toDestination();
+                alertOscillator = new Tone.Oscillator({ type: "square", frequency: "C5", volume: -12 }).toDestination();
             }
             if (Tone.context.state !== 'running') {
                 Tone.start();
@@ -852,8 +862,10 @@
              if(!isManualScanning) scanAllBtn.disabled = false;
              autoScanBtn.innerHTML = '<i class="fas fa-robot"></i> Start Auto-Scan';
              autoScanBtn.classList.remove('active-scan');
-             if(wasCancelledByUser) logMessage('Auto-scanner stopped.');
-             stopAlert();
+             if(wasCancelledByUser) {
+                logMessage('Auto-scanner stopped.');
+                stopAlert();
+             }
         }
 
         function toggleAutoScanner() {
@@ -892,9 +904,15 @@
                 const allPaths = generateAllPaths();
                 const opportunity = await scanForOpportunities(allPaths, true);
                 if (opportunity) {
-                    logMessage(`Opportunity found! Auto-scan stopped.`, false);
+                    const autoExecuteEnabled = document.getElementById('autoExecuteToggle').checked;
+                    if (autoExecuteEnabled) {
+                        logMessage('Opportunity found! Auto-executing trade...', false);
+                        executeTrade(opportunity);
+                    } else {
+                        logMessage(`Opportunity found! Auto-scan stopped.`, false);
+                        startAlert();
+                    }
                     stopAutoScan(false);
-                    startAlert();
                     break;
                 }
                 
@@ -1014,8 +1032,9 @@
                 logMessage(`SUCCESS: New best opportunity found! Path: ${bestOpportunity.name} Profit: ${bestOpportunity.profit.toFixed(4)}%`, false);
                 currentOpportunity = bestOpportunity;
                 document.getElementById('executeTrade').disabled = false;
-                startAlert();
-                if (stopOnFirst) return bestOpportunity;
+                if (stopOnFirst) return bestOpportunity; // Return opp for auto-execute
+                
+                startAlert(); // Only start alert for manual scans
             } else if (!stopOnFirst) {
                 logMessage("Scan complete. No profitable opportunities found.", false, true);
             }
@@ -1027,10 +1046,10 @@
             return null;
         }
 
-        async function executeTrade() {
-            if (!currentOpportunity) return logMessage("No opportunity to execute.", true);
+        async function executeTrade(opportunityToExecute) {
+            if (!opportunityToExecute) return logMessage("No opportunity provided to execute.", true);
             stopAlert();
-            logMessage(`Preparing to execute: ${currentOpportunity.name}`);
+            logMessage(`Preparing to execute: ${opportunityToExecute.name}`);
             const executeBtn = document.getElementById('executeTrade');
             executeBtn.disabled = true;
             document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-cogs"></i> Estimating gas fee...</div>`;
@@ -1039,7 +1058,7 @@
                 const gasPrice = await provider.getGasPrice();
                 document.getElementById('gasPriceDisplay').textContent = `${parseFloat(ethers.utils.formatUnits(gasPrice, 'gwei')).toFixed(2)} Gwei`;
                 
-                const estimatedGasLimit = await contract.estimateGas.executeArbitrage(currentOpportunity.path[0], currentOpportunity.amountIn, currentOpportunity.path, currentOpportunity.dexes);
+                const estimatedGasLimit = await contract.estimateGas.executeArbitrage(opportunityToExecute.path[0], opportunityToExecute.amountIn, opportunityToExecute.path, opportunityToExecute.dexes);
                 const gasLimit = estimatedGasLimit.mul(120).div(100);
                 const totalGasFee = gasPrice.mul(gasLimit);
                 const feeInBnb = ethers.utils.formatEther(totalGasFee);
@@ -1047,7 +1066,7 @@
                 logMessage(`Estimated network fee: ${feeInBnb} BNB. Please confirm in your wallet.`);
                 document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-fire"></i> Estimated Fee: <strong>${parseFloat(feeInBnb).toFixed(8)} BNB</strong></div><div class="execution-status status-pending" style="margin-top: 5px;"><i class="fas fa-wallet"></i> Waiting for wallet confirmation...</div>`;
 
-                const tx = await contract.executeArbitrage(currentOpportunity.path[0], currentOpportunity.amountIn, currentOpportunity.path, currentOpportunity.dexes, { gasPrice, gasLimit });
+                const tx = await contract.executeArbitrage(opportunityToExecute.path[0], opportunityToExecute.amountIn, opportunityToExecute.path, opportunityToExecute.dexes, { gasPrice, gasLimit });
                 logMessage(`Transaction sent with hash: ${tx.hash}`);
                 document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-hourglass-half"></i> Tx Sent: <a href="https://bscscan.com/tx/${tx.hash}" target="_blank" class="tx-link">${tx.hash}</a></div>`;
                 
