@@ -212,6 +212,9 @@
             font-size: 1rem;
             word-break: break-all;
             color: var(--text-light);
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         
         .progress-container {
@@ -346,6 +349,18 @@
             color: var(--text-dark);
             font-size: 0.85rem;
         }
+        
+        .copy-btn {
+            background: none;
+            border: none;
+            color: var(--text-dark);
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 5px;
+        }
+        .copy-btn:hover {
+            color: var(--primary);
+        }
     </style>
 </head>
 <body>
@@ -433,7 +448,10 @@
             <div class="contract-section">
                 <div class="config-item">
                     <div class="config-label">Contract Address</div>
-                    <div class="config-value" id="contractAddress">...</div>
+                    <div class="config-value">
+                        <span id="contractAddress">...</span>
+                        <button id="copyContractBtn" class="copy-btn"><i class="far fa-copy"></i></button>
+                    </div>
                 </div>
             </div>
             
@@ -580,12 +598,19 @@
             document.getElementById('minProfitInput').addEventListener('change', (e) => { MIN_PROFIT_THRESHOLD = parseFloat(e.target.value); logMessage(`Min Profit set to ${MIN_PROFIT_THRESHOLD}%`); });
             document.getElementById('flashLoanInput').addEventListener('change', (e) => { FLASH_LOAN_AMOUNT = parseFloat(e.target.value); logMessage(`Flash Loan set to ${FLASH_LOAN_AMOUNT} BNB`); });
             document.getElementById('maxGasFeeInput').addEventListener('change', (e) => { MAX_GAS_FEE = parseFloat(e.target.value); logMessage(`Max Gas Fee set to ${MAX_GAS_FEE} BNB`); });
+            document.getElementById('copyContractBtn').addEventListener('click', copyContractAddress);
             
             const checksummedAddr = toChecksumAddress(RAW_CONTRACT_ADDRESS);
             document.getElementById('checksumStatus').textContent = checksummedAddr ? '✅ Valid' : '❌ Invalid';
             document.getElementById('checksumStatus').className = checksummedAddr ? 'success' : 'error';
             document.getElementById('dexesActive').textContent = Object.keys(DEXS).length;
             document.getElementById('contractAddress').textContent = `${RAW_CONTRACT_ADDRESS.substring(0, 6)}...${RAW_CONTRACT_ADDRESS.substring(RAW_CONTRACT_ADDRESS.length - 4)}`;
+        }
+
+        function copyContractAddress() {
+            navigator.clipboard.writeText(RAW_CONTRACT_ADDRESS).then(() => {
+                logMessage('Contract address copied to clipboard');
+            });
         }
 
         function startAlert() {
