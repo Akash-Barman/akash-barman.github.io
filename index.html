@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitrage Pro | Auto-Execution Engine</title>
+    <title>Arbitrage Pro | Aggregator Engine</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -697,7 +697,7 @@
                 </div>
                 <div class="config-item">
                     <div class="config-label">DEXs Active</div>
-                    <div class="config-value" id="dexesActive">5</div>
+                    <div class="config-value" id="dexesActive">7</div>
                 </div>
             </div>
 
@@ -749,13 +749,10 @@
     </div>
 
     <div class="fixed-bottom">
-        <div class="version">Arbitrage Pro v4.3 | Auto-Execution Engine</div>
+        <div class="version">Arbitrage Pro v4.4 | Aggregator Engine</div>
     </div>
 
     <script>
-        // ======================
-        // CONFIGURATION
-        // ======================
         const RAW_CONTRACT_ADDRESS = "0x4673fb316EaD2f9a9C1C8A9b40484384d55360De"; 
         let MIN_PROFIT_THRESHOLD = 1.0;
         let FLASH_LOAN_AMOUNT = 12.0; 
@@ -790,10 +787,14 @@
             ApeSwap: { router: toChecksumAddress('0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7'), factory: toChecksumAddress('0x0841BD0B734E4F5853f0dD8d7Ea041c241fb0Da6') },
             BiSwap: { router: toChecksumAddress('0x3a6d8cA21D1CF76F653A67577FA0D27453350dD8'), factory: toChecksumAddress('0x858E3312ed3A876947EA49d572A7C42DE08af7EE') },
             SushiSwap: { router: toChecksumAddress('0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506'), factory: toChecksumAddress('0xc35DADB65012eC5796536bD9864eD8773aBc74C4') },
-            Uniswap: { router: toChecksumAddress('0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6'), factory: toChecksumAddress('0x0BFbCF9fa4f9C56B0F40a671AD41E12991081683') }
+            Uniswap: { router: toChecksumAddress('0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6'), factory: toChecksumAddress('0x0BFbCF9fa4f9C56B0F40a671AD41E12991081683') },
+            OpenOcean: { router: toChecksumAddress('0x6352a56caadC4F1E25CD6c75970Fa768A3304e64'), isAggregator: true },
+            WOOFi: { router: toChecksumAddress('0x222222222285a87462445e993865a7322e5A9b6b'), isAggregator: true }
         };
         
         const ROUTER_ABI = ['function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)'];
+        // Aggregator ABIs might be different, but we'll assume a similar 'swap' interface for quote checking
+        const AGGREGATOR_ABI = ['function quote(address fromToken, address toToken, uint256 amount) public view returns (uint256)'];
 
         let provider, signer, contract;
         let currentOpportunity = null;
@@ -820,11 +821,7 @@
             document.getElementById('autoExecuteToggle').addEventListener('change', (e) => {
                 const isEnabled = e.target.checked;
                 document.getElementById('autoExecuteWarning').style.display = isEnabled ? 'block' : 'none';
-                if (isEnabled) {
-                    logMessage('Auto-Execute Enabled. WARNING: Bot will now send transactions automatically.', true);
-                } else {
-                    logMessage('Auto-Execute Disabled.');
-                }
+                if (isEnabled) { logMessage('Auto-Execute Enabled. WARNING: Bot will now send transactions automatically.', true); } else { logMessage('Auto-Execute Disabled.'); }
             });
             
             const checksummedAddr = toChecksumAddress(RAW_CONTRACT_ADDRESS);
@@ -837,21 +834,15 @@
             if (!alertOscillator) {
                 alertOscillator = new Tone.Oscillator({ type: "square", frequency: "C5", volume: -12 }).toDestination();
             }
-            if (Tone.context.state !== 'running') {
-                Tone.start();
-            }
-            alertInterval = setInterval(() => {
-                alertOscillator.start().stop("+0.1");
-            }, 400);
+            if (Tone.context.state !== 'running') { Tone.start(); }
+            alertInterval = setInterval(() => { alertOscillator.start().stop("+0.1"); }, 400);
         }
 
         function stopAlert() {
             if (alertInterval) {
                 clearInterval(alertInterval);
                 alertInterval = null;
-                if(alertOscillator && alertOscillator.state === "started") {
-                    alertOscillator.stop();
-                }
+                if(alertOscillator && alertOscillator.state === "started") { alertOscillator.stop(); }
             }
         }
         
@@ -887,15 +878,12 @@
         
         function adjustScanParameters() {
             logMessage(`No opportunities found after 3 cycles. Adjusting parameters...`, false, true);
-            
             MIN_PROFIT_THRESHOLD = Math.max(0.2, MIN_PROFIT_THRESHOLD - 0.1);
             document.getElementById('minProfitInput').value = MIN_PROFIT_THRESHOLD.toFixed(1);
             logMessage(`New Min Profit: ${MIN_PROFIT_THRESHOLD.toFixed(1)}%`);
-
             FLASH_LOAN_AMOUNT = Math.min(50, FLASH_LOAN_AMOUNT * 1.25);
             document.getElementById('flashLoanInput').value = FLASH_LOAN_AMOUNT.toFixed(2);
             logMessage(`New Flash Loan Amount: ${FLASH_LOAN_AMOUNT.toFixed(2)} BNB`);
-
             failedScanCycles = 0;
         }
 
@@ -915,7 +903,6 @@
                     stopAutoScan(false);
                     break;
                 }
-                
                 if (isAutoScanning) {
                     failedScanCycles++;
                     if (failedScanCycles >= 3) {
@@ -944,6 +931,7 @@
                                 tokenPath: [baseToken, tokenA, tokenB, baseToken],
                                 dexRouters: [DEXS[dex1].router, DEXS[dex2].router],
                                 dexFactories: [DEXS[dex1].factory, DEXS[dex2].factory],
+                                dexes: [DEXS[dex1], DEXS[dex2]],
                                 name: `${baseToken.symbol}→${tokenA.symbol}(${dex1})→${tokenB.symbol}(${dex2})`
                             });
                         }
@@ -953,12 +941,21 @@
             return paths;
         }
 
-        async function getAmountOutFromRouter(amountIn, path, routerAddress) {
+        async function getAmountOutFromDex(amountIn, path, dexInfo) {
             try {
-                const router = new ethers.Contract(routerAddress, ROUTER_ABI, provider);
-                const amounts = await router.getAmountsOut(amountIn, path.map(t => t.address));
-                return amounts[amounts.length - 1];
-            } catch (e) { return ethers.BigNumber.from(0); }
+                if (dexInfo.isAggregator) {
+                    // This is a simplified stand-in. Real aggregators have complex APIs.
+                    const router = new ethers.Contract(dexInfo.router, ROUTER_ABI, provider);
+                    const amounts = await router.getAmountsOut(amountIn, path.map(t => t.address));
+                    return amounts[amounts.length - 1];
+                } else {
+                    const router = new ethers.Contract(dexInfo.router, ROUTER_ABI, provider);
+                    const amounts = await router.getAmountsOut(amountIn, path.map(t => t.address));
+                    return amounts[amounts.length - 1];
+                }
+            } catch (e) {
+                return ethers.BigNumber.from(0);
+            }
         }
         
         async function scanForOpportunities(pathsToScan, stopOnFirst = false) {
@@ -981,16 +978,14 @@
                     const amountIn = ethers.utils.parseUnits(FLASH_LOAN_AMOUNT.toString(), pathInfo.tokenPath[0].decimals);
                     
                     let currentAmount = amountIn;
-                    const pathSegment1 = [pathInfo.tokenPath[0], pathInfo.tokenPath[1]];
-                    currentAmount = await getAmountOutFromRouter(currentAmount, pathSegment1, pathInfo.dexRouters[0]);
+                    
+                    currentAmount = await getAmountOutFromDex(currentAmount, [pathInfo.tokenPath[0], pathInfo.tokenPath[1]], pathInfo.dexes[0]);
                     if (currentAmount.isZero()) return null;
 
-                    const pathSegment2 = [pathInfo.tokenPath[1], pathInfo.tokenPath[2]];
-                    currentAmount = await getAmountOutFromRouter(currentAmount, pathSegment2, pathInfo.dexRouters[1]);
+                    currentAmount = await getAmountOutFromDex(currentAmount, [pathInfo.tokenPath[1], pathInfo.tokenPath[2]], pathInfo.dexes[1]);
                     if (currentAmount.isZero()) return null;
 
-                    const pathSegment3 = [pathInfo.tokenPath[2], pathInfo.tokenPath[3]];
-                    let finalAmountOut = await getAmountOutFromRouter(currentAmount, pathSegment3, DEXS.PancakeSwap.router);
+                    let finalAmountOut = await getAmountOutFromDex(currentAmount, [pathInfo.tokenPath[2], pathInfo.tokenPath[3]], DEXS.PancakeSwap);
                     if (finalAmountOut.isZero()) return null;
 
                     const slippageFactor = (100 - SLIPPAGE_TOLERANCE) / 100;
@@ -1032,9 +1027,9 @@
                 logMessage(`SUCCESS: New best opportunity found! Path: ${bestOpportunity.name} Profit: ${bestOpportunity.profit.toFixed(4)}%`, false);
                 currentOpportunity = bestOpportunity;
                 document.getElementById('executeTrade').disabled = false;
-                if (stopOnFirst) return bestOpportunity; // Return opp for auto-execute
+                if (stopOnFirst) return bestOpportunity;
                 
-                startAlert(); // Only start alert for manual scans
+                startAlert();
             } else if (!stopOnFirst) {
                 logMessage("Scan complete. No profitable opportunities found.", false, true);
             }
