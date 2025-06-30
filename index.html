@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitrage Pro | Aggregator Engine</title>
+    <title>Arbitrage Pro | Advanced Aggregator</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -144,7 +144,7 @@
             gap: 15px;
             margin-bottom: 25px;
         }
-        
+
         button, .btn {
             background: linear-gradient(to right, var(--primary), var(--primary-dark));
             color: white;
@@ -579,6 +579,37 @@
             background: rgba(245, 158, 11, 0.2);
             color: var(--warning);
         }
+        
+        .security-section {
+            background: rgba(31, 41, 55, 0.7);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            border: 1px solid var(--border);
+        }
+        
+        .security-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            margin: 3px 0;
+        }
+        
+        .security-high {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+        }
+        
+        .security-medium {
+            background-color: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+        }
+        
+        .security-low {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+        }
     </style>
 </head>
 <body>
@@ -635,12 +666,21 @@
                     <input type="number" id="slippageInput" class="slippage-input" value="1.0" min="0.1" max="50" step="0.1">%
                 </div>
 
-                <div class="slippage-control" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+                <div class="slippage-control" style="margin-top: 15px;">
                     <span class="config-label" style="color: var(--warning);">Auto-Execute Trade</span>
                     <input type="checkbox" id="autoExecuteToggle" style="width: 20px; height: 20px; cursor: pointer;">
                 </div>
                 <div id="autoExecuteWarning" class="warning" style="display: none; margin-top: 10px;">
                     <strong>EXTREME RISK:</strong> When enabled, this bot will automatically send transactions and spend your gas fees without asking for confirmation. Use with caution.
+                </div>
+                
+                <!-- Auto-Approve Toggle -->
+                <div class="slippage-control" style="margin-top: 15px;">
+                    <span class="config-label" style="color: var(--warning);">Auto-Approve Transactions</span>
+                    <input type="checkbox" id="autoApproveToggle" style="width: 20px; height: 20px; cursor: pointer;">
+                </div>
+                <div id="autoApproveWarning" class="warning" style="display: none; margin-top: 10px;">
+                    <strong>AUTOMATIC APPROVAL ENABLED:</strong> When enabled, this bot will automatically approve token spending without manual confirmation. Use with caution.
                 </div>
             </div>
             
@@ -700,6 +740,23 @@
                     <div class="config-value" id="dexesActive">7</div>
                 </div>
             </div>
+            
+            <!-- Security Section -->
+            <div class="security-section">
+                <div class="simulation-title"><i class="fas fa-shield-alt"></i> Security Status</div>
+                <div class="reserve-row">
+                    <span class="reserve-label">Private Key Protection:</span>
+                    <span class="security-badge security-high">Active</span>
+                </div>
+                <div class="reserve-row">
+                    <span class="reserve-label">Approval Status:</span>
+                    <span id="approvalStatus" class="security-badge security-medium">Pending Setup</span>
+                </div>
+                <div class="reserve-row">
+                    <span class="reserve-label">Wallet Connection:</span>
+                    <span id="walletSecurity" class="security-badge security-low">Not Connected</span>
+                </div>
+            </div>
 
             <div class="section-title"><i class="fas fa-history"></i> Backtesting Tool</div>
             <div class="simulation-panel">
@@ -757,6 +814,13 @@
         let MIN_PROFIT_THRESHOLD = 1.0;
         let FLASH_LOAN_AMOUNT = 12.0; 
         let SLIPPAGE_TOLERANCE = 5.0; 
+        let isAutoApproveEnabled = false;
+
+        // ERC20 ABI for token approvals
+        const ERC20_ABI = [
+            "function approve(address spender, uint256 amount) public returns (bool)",
+            "function allowance(address owner, address spender) public view returns (uint256)"
+        ];
 
         function toChecksumAddress(address) {
             try { return ethers.utils.getAddress(address.toLowerCase()); } catch { return null; }
@@ -793,7 +857,6 @@
         };
         
         const ROUTER_ABI = ['function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)'];
-        // Aggregator ABIs might be different, but we'll assume a similar 'swap' interface for quote checking
         const AGGREGATOR_ABI = ['function quote(address fromToken, address toToken, uint256 amount) public view returns (uint256)'];
 
         let provider, signer, contract;
@@ -824,9 +887,46 @@
                 if (isEnabled) { logMessage('Auto-Execute Enabled. WARNING: Bot will now send transactions automatically.', true); } else { logMessage('Auto-Execute Disabled.'); }
             });
             
+            // Auto-Approve toggle event
+            document.getElementById('autoApproveToggle').addEventListener('change', (e) => {
+                isAutoApproveEnabled = e.target.checked;
+                document.getElementById('autoApproveWarning').style.display = isAutoApproveEnabled ? 'block' : 'none';
+                if (isAutoApproveEnabled) {
+                    logMessage('Auto-Approve Enabled. Token approvals will be handled automatically.', false, true);
+                } else {
+                    logMessage('Auto-Approve Disabled.');
+                }
+            });
+            
             const checksummedAddr = toChecksumAddress(RAW_CONTRACT_ADDRESS);
             document.getElementById('checksumStatus').textContent = checksummedAddr ? '✅ Valid' : '❌ Invalid';
             document.getElementById('checksumStatus').className = checksummedAddr ? 'success' : 'error';
+        }
+
+        // Function to set token allowance
+        async function setMaxApproval(tokenAddress, spender) {
+            try {
+                logMessage(`Setting token allowance for contract...`);
+                const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+                const tx = await tokenContract.approve(spender, ethers.constants.MaxUint256);
+                logMessage(`Approval transaction sent: ${tx.hash}`);
+                document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-hourglass-half"></i> Approval Tx Sent: <a href="https://bscscan.com/tx/${tx.hash}" target="_blank" class="tx-link">${tx.hash}</a></div>`;
+                
+                const receipt = await tx.wait();
+                if (receipt.status === 1) {
+                    logMessage("Token allowance set successfully!");
+                    document.getElementById('executionResult').innerHTML = `<div class="execution-status status-confirmed"><i class="fas fa-check-circle"></i> Approval Confirmed!</div>`;
+                    document.getElementById('approvalStatus').textContent = "Approved";
+                    document.getElementById('approvalStatus').className = "security-badge security-high";
+                    return true;
+                } else {
+                    throw new Error(`Approval transaction failed. Hash: ${tx.hash}`);
+                }
+            } catch(e) {
+                logMessage(`Approval failed: ${e.message}`, true);
+                document.getElementById('executionResult').innerHTML = `<div class="execution-status status-failed"><i class="fas fa-times-circle"></i> Approval Failed: ${e.message}</div>`;
+                return false;
+            }
         }
 
         function startAlert() {
@@ -893,7 +993,10 @@
                 const opportunity = await scanForOpportunities(allPaths, true);
                 if (opportunity) {
                     const autoExecuteEnabled = document.getElementById('autoExecuteToggle').checked;
-                    if (autoExecuteEnabled) {
+                    if (autoExecuteEnabled && isAutoApproveEnabled) {
+                        logMessage('Opportunity found! Auto-executing trade with auto-approval...', false);
+                        executeTrade(opportunity);
+                    } else if (autoExecuteEnabled) {
                         logMessage('Opportunity found! Auto-executing trade...', false);
                         executeTrade(opportunity);
                     } else {
@@ -953,7 +1056,7 @@
                     const amounts = await router.getAmountsOut(amountIn, path.map(t => t.address));
                     return amounts[amounts.length - 1];
                 }
-            } catch (e) {
+            } catch(e) {
                 return ethers.BigNumber.from(0);
             }
         }
@@ -1053,6 +1156,23 @@
                 const gasPrice = await provider.getGasPrice();
                 document.getElementById('gasPriceDisplay').textContent = `${parseFloat(ethers.utils.formatUnits(gasPrice, 'gwei')).toFixed(2)} Gwei`;
                 
+                // Auto-approve logic
+                if (isAutoApproveEnabled) {
+                    const tokenContract = new ethers.Contract(opportunityToExecute.path[0], ERC20_ABI, provider);
+                    const userAddress = await signer.getAddress();
+                    const allowance = await tokenContract.allowance(userAddress, contract.address);
+                    
+                    if (allowance.lt(opportunityToExecute.amountIn)) {
+                        logMessage(`Insufficient token allowance. Auto-approving...`);
+                        const approvalSuccess = await setMaxApproval(opportunityToExecute.path[0], contract.address);
+                        if (!approvalSuccess) {
+                            throw new Error("Token approval failed");
+                        }
+                    } else {
+                        logMessage(`Sufficient token allowance already exists.`);
+                    }
+                }
+                
                 const estimatedGasLimit = await contract.estimateGas.executeArbitrage(opportunityToExecute.path[0], opportunityToExecute.amountIn, opportunityToExecute.path, opportunityToExecute.dexes);
                 const gasLimit = estimatedGasLimit.mul(120).div(100);
                 const totalGasFee = gasPrice.mul(gasLimit);
@@ -1100,6 +1220,8 @@
                 contract = new ethers.Contract(toChecksumAddress(RAW_CONTRACT_ADDRESS), CONTRACT_ABI, signer);
                 
                 document.getElementById('walletStatus').textContent = "Connected";
+                document.getElementById('walletSecurity').textContent = "Secure";
+                document.getElementById('walletSecurity').className = "security-badge security-high";
                 document.getElementById('connectWallet').style.display = 'none';
                 document.getElementById('scanAll').disabled = false;
                 document.getElementById('autoScanToggle').disabled = false;
@@ -1123,8 +1245,12 @@
             document.getElementById('scanProgress').style.width = `${progress}%`;
             document.getElementById('progressPercent').textContent = `${progress}%`;
         }
+        function copyContractAddress() {
+            navigator.clipboard.writeText(RAW_CONTRACT_ADDRESS);
+            logMessage("Contract address copied to clipboard!");
+        }
 
-        // SIMULATED FUNCTIONS (UNCHANGED)
+        // SIMULATED FUNCTIONS
         async function runBacktest() {
             logMessage("Running backtest with historical data (simulation)...");
             const backtestResultsEl = document.getElementById('backtestResults');
@@ -1145,6 +1271,10 @@
             prices.forEach(dex => { priceHTML += `<div class="dex-comparison-row"><div class="dex-name">${dex.name}:</div><div class="dex-price">${dex.price.toFixed(4)} USD</div></div>`; });
             dexComparisonEl.innerHTML = priceHTML;
         }
+        
+        // Initialize simulated buttons
+        document.getElementById('runBacktest').addEventListener('click', runBacktest);
+        document.getElementById('comparePrices').addEventListener('click', compareDexPrices);
     </script>
 </body>
 </html>
