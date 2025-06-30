@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitrage Pro | Advanced Aggregator</title>
+    <title>Arbitrage Pro | Gemini AI Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -144,7 +144,7 @@
             gap: 15px;
             margin-bottom: 25px;
         }
-
+        
         button, .btn {
             background: linear-gradient(to right, var(--primary), var(--primary-dark));
             color: white;
@@ -579,37 +579,6 @@
             background: rgba(245, 158, 11, 0.2);
             color: var(--warning);
         }
-        
-        .security-section {
-            background: rgba(31, 41, 55, 0.7);
-            border-radius: 10px;
-            padding: 15px;
-            margin-top: 15px;
-            border: 1px solid var(--border);
-        }
-        
-        .security-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 0.85rem;
-            margin: 3px 0;
-        }
-        
-        .security-high {
-            background-color: rgba(16, 185, 129, 0.15);
-            color: var(--success);
-        }
-        
-        .security-medium {
-            background-color: rgba(245, 158, 11, 0.15);
-            color: var(--warning);
-        }
-        
-        .security-low {
-            background-color: rgba(239, 68, 68, 0.15);
-            color: var(--danger);
-        }
     </style>
 </head>
 <body>
@@ -642,6 +611,9 @@
                  <button id="executeTrade" disabled class="secondary">
                     <i class="fas fa-bolt"></i> Execute Best Trade
                 </button>
+                 <button id="analyzeTrade" disabled class="secondary">
+                    ✨ Analyze Opportunity
+                </button>
             </div>
             
             <div class="simulation-panel">
@@ -666,24 +638,20 @@
                     <input type="number" id="slippageInput" class="slippage-input" value="1.0" min="0.1" max="50" step="0.1">%
                 </div>
 
-                <div class="slippage-control" style="margin-top: 15px;">
+                <div class="slippage-control" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
                     <span class="config-label" style="color: var(--warning);">Auto-Execute Trade</span>
                     <input type="checkbox" id="autoExecuteToggle" style="width: 20px; height: 20px; cursor: pointer;">
                 </div>
                 <div id="autoExecuteWarning" class="warning" style="display: none; margin-top: 10px;">
                     <strong>EXTREME RISK:</strong> When enabled, this bot will automatically send transactions and spend your gas fees without asking for confirmation. Use with caution.
                 </div>
-                
-                <!-- Auto-Approve Toggle -->
-                <div class="slippage-control" style="margin-top: 15px;">
-                    <span class="config-label" style="color: var(--warning);">Auto-Approve Transactions</span>
-                    <input type="checkbox" id="autoApproveToggle" style="width: 20px; height: 20px; cursor: pointer;">
-                </div>
-                <div id="autoApproveWarning" class="warning" style="display: none; margin-top: 10px;">
-                    <strong>AUTOMATIC APPROVAL ENABLED:</strong> When enabled, this bot will automatically approve token spending without manual confirmation. Use with caution.
-                </div>
             </div>
             
+            <div id="geminiAnalysisContainer" class="simulation-panel" style="display:none; border-color: var(--secondary);">
+                 <div class="simulation-title">✨ AI Opportunity Analysis</div>
+                 <div id="geminiAnalysisResult" style="line-height: 1.6;"></div>
+            </div>
+
             <div class="progress-container">
                 <div class="progress-label">
                     <span>Scan Progress</span>
@@ -737,24 +705,7 @@
                 </div>
                 <div class="config-item">
                     <div class="config-label">DEXs Active</div>
-                    <div class="config-value" id="dexesActive">7</div>
-                </div>
-            </div>
-            
-            <!-- Security Section -->
-            <div class="security-section">
-                <div class="simulation-title"><i class="fas fa-shield-alt"></i> Security Status</div>
-                <div class="reserve-row">
-                    <span class="reserve-label">Private Key Protection:</span>
-                    <span class="security-badge security-high">Active</span>
-                </div>
-                <div class="reserve-row">
-                    <span class="reserve-label">Approval Status:</span>
-                    <span id="approvalStatus" class="security-badge security-medium">Pending Setup</span>
-                </div>
-                <div class="reserve-row">
-                    <span class="reserve-label">Wallet Connection:</span>
-                    <span id="walletSecurity" class="security-badge security-low">Not Connected</span>
+                    <div class="config-value" id="dexesActive">12</div>
                 </div>
             </div>
 
@@ -806,7 +757,7 @@
     </div>
 
     <div class="fixed-bottom">
-        <div class="version">Arbitrage Pro v4.4 | Aggregator Engine</div>
+        <div class="version">Arbitrage Pro v4.8 | Gemini AI Engine</div>
     </div>
 
     <script>
@@ -814,13 +765,6 @@
         let MIN_PROFIT_THRESHOLD = 1.0;
         let FLASH_LOAN_AMOUNT = 12.0; 
         let SLIPPAGE_TOLERANCE = 5.0; 
-        let isAutoApproveEnabled = false;
-
-        // ERC20 ABI for token approvals
-        const ERC20_ABI = [
-            "function approve(address spender, uint256 amount) public returns (bool)",
-            "function allowance(address owner, address spender) public view returns (uint256)"
-        ];
 
         function toChecksumAddress(address) {
             try { return ethers.utils.getAddress(address.toLowerCase()); } catch { return null; }
@@ -847,17 +791,22 @@
         };
         
         const DEXS = {
-            PancakeSwap: { router: toChecksumAddress('0x10ED43C718714eb63d5aA57B78B54704E256024E'), factory: toChecksumAddress('0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73') },
-            ApeSwap: { router: toChecksumAddress('0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7'), factory: toChecksumAddress('0x0841BD0B734E4F5853f0dD8d7Ea041c241fb0Da6') },
-            BiSwap: { router: toChecksumAddress('0x3a6d8cA21D1CF76F653A67577FA0D27453350dD8'), factory: toChecksumAddress('0x858E3312ed3A876947EA49d572A7C42DE08af7EE') },
-            SushiSwap: { router: toChecksumAddress('0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506'), factory: toChecksumAddress('0xc35DADB65012eC5796536bD9864eD8773aBc74C4') },
-            Uniswap: { router: toChecksumAddress('0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6'), factory: toChecksumAddress('0x0BFbCF9fa4f9C56B0F40a671AD41E12991081683') },
-            OpenOcean: { router: toChecksumAddress('0x6352a56caadC4F1E25CD6c75970Fa768A3304e64'), isAggregator: true },
-            WOOFi: { router: toChecksumAddress('0x222222222285a87462445e993865a7322e5A9b6b'), isAggregator: true }
+            PancakeSwap: { router: toChecksumAddress('0x10ED43C718714eb63d5aA57B78B54704E256024E'), factory: toChecksumAddress('0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73'), type: 'v2' },
+            PancakeSwapV3: { router: toChecksumAddress('0x1b81D678ffb9C0263b24A97847620C99d213eB14'), quoter: toChecksumAddress('0xB048Bbc1Ee4b786228dE3362434b472480479241'), factory: toChecksumAddress('0x0BFbCF9fa4f9C56B0F40a671AD41E12991081683'), type: 'v3', fee: 2500},
+            ApeSwap: { router: toChecksumAddress('0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7'), factory: toChecksumAddress('0x0841BD0B734E4F5853f0dD8d7Ea041c241fb0Da6'), type: 'v2' },
+            BiSwap: { router: toChecksumAddress('0x3a6d8cA21D1CF76F653A67577FA0D27453350dD8'), factory: toChecksumAddress('0x858E3312ed3A876947EA49d572A7C42DE08af7EE'), type: 'v2' },
+            SushiSwap: { router: toChecksumAddress('0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506'), factory: toChecksumAddress('0xc35DADB65012eC5796536bD9864eD8773aBc74C4'), type: 'v2' },
+            BabyDogeSwap: { router: toChecksumAddress('0xCBe6C2f275429354395355555555555555555555'), factory: toChecksumAddress('0x83595C33527161b3b194551105948011215C5328'), type: 'v2'},
+            MDEX: { router: toChecksumAddress('0x7DAe51BD3E3376B8c7c4900E9107f12Be3AF1bA8'), factory: toChecksumAddress('0x3CD1C46062d140A2167352266b943266b3062366'), type: 'v2'},
+            BakerySwap: { router: toChecksumAddress('0x3253a9C35465620844215038559624542E754C8E'), factory: toChecksumAddress('0x01bF7C66c6BD861915CdaaE475042D3c4BaE16A7'), type: 'v2'},
+            KnightSwap: { router: toChecksumAddress('0x05E61E0722361952206d52542B47230467149793'), factory: toChecksumAddress('0x242A585F8B833f48269734A232a2402127393444'), type: 'v2'},
+            UniswapBSC: { router: toChecksumAddress('0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6'), factory: toChecksumAddress('0x0BFbCF9fa4f9C56B0F40a671AD41E12991081683'), type: 'v2' },
+            OpenOcean: { router: toChecksumAddress('0x6352a56caadC4F1E25CD6c75970Fa768A3304e64'), type: 'aggregator' },
+            WOOFi: { router: toChecksumAddress('0x222222222285a87462445e993865a7322e5A9b6b'), type: 'aggregator' }
         };
         
-        const ROUTER_ABI = ['function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)'];
-        const AGGREGATOR_ABI = ['function quote(address fromToken, address toToken, uint256 amount) public view returns (uint256)'];
+        const V2_ROUTER_ABI = ['function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)'];
+        const V3_QUOTER_ABI = ['function quoteExactInputSingle(address tokenIn, address tokenOut, uint24 fee, uint256 amountIn, uint160 sqrtPriceLimitX96) external view returns (uint256 amountOut)'];
 
         let provider, signer, contract;
         let currentOpportunity = null;
@@ -876,6 +825,7 @@
                 scanForOpportunities(allPaths);
             });
             document.getElementById('executeTrade').addEventListener('click', () => executeTrade(currentOpportunity));
+            document.getElementById('analyzeTrade').addEventListener('click', analyzeOpportunity);
             document.getElementById('viewContract').addEventListener('click', viewContract);
             document.getElementById('autoScanToggle').addEventListener('click', toggleAutoScanner);
             document.getElementById('slippageInput').addEventListener('change', (e) => { SLIPPAGE_TOLERANCE = parseFloat(e.target.value); logMessage(`Slippage set to ${SLIPPAGE_TOLERANCE}%`); });
@@ -887,46 +837,10 @@
                 if (isEnabled) { logMessage('Auto-Execute Enabled. WARNING: Bot will now send transactions automatically.', true); } else { logMessage('Auto-Execute Disabled.'); }
             });
             
-            // Auto-Approve toggle event
-            document.getElementById('autoApproveToggle').addEventListener('change', (e) => {
-                isAutoApproveEnabled = e.target.checked;
-                document.getElementById('autoApproveWarning').style.display = isAutoApproveEnabled ? 'block' : 'none';
-                if (isAutoApproveEnabled) {
-                    logMessage('Auto-Approve Enabled. Token approvals will be handled automatically.', false, true);
-                } else {
-                    logMessage('Auto-Approve Disabled.');
-                }
-            });
-            
             const checksummedAddr = toChecksumAddress(RAW_CONTRACT_ADDRESS);
             document.getElementById('checksumStatus').textContent = checksummedAddr ? '✅ Valid' : '❌ Invalid';
             document.getElementById('checksumStatus').className = checksummedAddr ? 'success' : 'error';
-        }
-
-        // Function to set token allowance
-        async function setMaxApproval(tokenAddress, spender) {
-            try {
-                logMessage(`Setting token allowance for contract...`);
-                const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
-                const tx = await tokenContract.approve(spender, ethers.constants.MaxUint256);
-                logMessage(`Approval transaction sent: ${tx.hash}`);
-                document.getElementById('executionResult').innerHTML = `<div class="execution-status status-pending"><i class="fas fa-hourglass-half"></i> Approval Tx Sent: <a href="https://bscscan.com/tx/${tx.hash}" target="_blank" class="tx-link">${tx.hash}</a></div>`;
-                
-                const receipt = await tx.wait();
-                if (receipt.status === 1) {
-                    logMessage("Token allowance set successfully!");
-                    document.getElementById('executionResult').innerHTML = `<div class="execution-status status-confirmed"><i class="fas fa-check-circle"></i> Approval Confirmed!</div>`;
-                    document.getElementById('approvalStatus').textContent = "Approved";
-                    document.getElementById('approvalStatus').className = "security-badge security-high";
-                    return true;
-                } else {
-                    throw new Error(`Approval transaction failed. Hash: ${tx.hash}`);
-                }
-            } catch(e) {
-                logMessage(`Approval failed: ${e.message}`, true);
-                document.getElementById('executionResult').innerHTML = `<div class="execution-status status-failed"><i class="fas fa-times-circle"></i> Approval Failed: ${e.message}</div>`;
-                return false;
-            }
+            document.getElementById('dexesActive').textContent = Object.keys(DEXS).length;
         }
 
         function startAlert() {
@@ -993,15 +907,12 @@
                 const opportunity = await scanForOpportunities(allPaths, true);
                 if (opportunity) {
                     const autoExecuteEnabled = document.getElementById('autoExecuteToggle').checked;
-                    if (autoExecuteEnabled && isAutoApproveEnabled) {
-                        logMessage('Opportunity found! Auto-executing trade with auto-approval...', false);
-                        executeTrade(opportunity);
-                    } else if (autoExecuteEnabled) {
+                    if (autoExecuteEnabled && !opportunity.isV3Path) {
                         logMessage('Opportunity found! Auto-executing trade...', false);
                         executeTrade(opportunity);
                     } else {
                         logMessage(`Opportunity found! Auto-scan stopped.`, false);
-                        startAlert();
+                        if (!autoExecuteEnabled) startAlert();
                     }
                     stopAutoScan(false);
                     break;
@@ -1024,7 +935,6 @@
             const dexKeys = Object.keys(DEXS);
             const paths = [];
 
-            // 3-hop paths (WBNB -> A -> B -> WBNB)
             for (const tokenA of otherTokens) {
                 for (const tokenB of otherTokens) {
                     if (tokenA.address === tokenB.address) continue;
@@ -1032,7 +942,6 @@
                         for (const dex2 of dexKeys) {
                              paths.push({
                                 tokenPath: [baseToken, tokenA, tokenB, baseToken],
-                                dexRouters: [DEXS[dex1].router, DEXS[dex2].router],
                                 dexFactories: [DEXS[dex1].factory, DEXS[dex2].factory],
                                 dexes: [DEXS[dex1], DEXS[dex2]],
                                 name: `${baseToken.symbol}→${tokenA.symbol}(${dex1})→${tokenB.symbol}(${dex2})`
@@ -1046,17 +955,15 @@
 
         async function getAmountOutFromDex(amountIn, path, dexInfo) {
             try {
-                if (dexInfo.isAggregator) {
-                    // This is a simplified stand-in. Real aggregators have complex APIs.
-                    const router = new ethers.Contract(dexInfo.router, ROUTER_ABI, provider);
-                    const amounts = await router.getAmountsOut(amountIn, path.map(t => t.address));
-                    return amounts[amounts.length - 1];
+                if (dexInfo.type === 'v3') {
+                    const quoter = new ethers.Contract(dexInfo.quoter, V3_QUOTER_ABI, provider);
+                    return await quoter.quoteExactInputSingle(path[0].address, path[1].address, dexInfo.fee, amountIn, 0);
                 } else {
-                    const router = new ethers.Contract(dexInfo.router, ROUTER_ABI, provider);
+                    const router = new ethers.Contract(dexInfo.router, V2_ROUTER_ABI, provider);
                     const amounts = await router.getAmountsOut(amountIn, path.map(t => t.address));
                     return amounts[amounts.length - 1];
                 }
-            } catch(e) {
+            } catch (e) {
                 return ethers.BigNumber.from(0);
             }
         }
@@ -1069,10 +976,12 @@
             }
 
             stopAlert();
+            document.getElementById('geminiAnalysisContainer').style.display = 'none';
             isManualScanning = !stopOnFirst;
             logMessage(`Scanning ${pathsToScan.length} total possible paths... (This may take a while)`);
             if (!isAutoScanning) document.getElementById('scanAll').disabled = true;
             document.getElementById('executeTrade').disabled = true;
+            document.getElementById('analyzeTrade').disabled = true;
             updateProgress(0);
 
             const checkPath = async (pathInfo) => {
@@ -1081,7 +990,6 @@
                     const amountIn = ethers.utils.parseUnits(FLASH_LOAN_AMOUNT.toString(), pathInfo.tokenPath[0].decimals);
                     
                     let currentAmount = amountIn;
-                    
                     currentAmount = await getAmountOutFromDex(currentAmount, [pathInfo.tokenPath[0], pathInfo.tokenPath[1]], pathInfo.dexes[0]);
                     if (currentAmount.isZero()) return null;
 
@@ -1098,7 +1006,8 @@
                     if (profit.gt(0)) {
                         const profitPercentage = (profit.mul(10000).div(amountIn)).toNumber() / 100;
                         if (profitPercentage > MIN_PROFIT_THRESHOLD) {
-                            return { profit: profitPercentage, path: pathInfo.tokenPath.map(p => p.address), dexes: pathInfo.dexFactories, name: pathInfo.name, amountIn };
+                             const isV3Path = pathInfo.dexes.some(d => d.type === 'v3');
+                            return { profit: profitPercentage, path: pathInfo.tokenPath.map(p => p.address), dexes: pathInfo.dexFactories, name: pathInfo.name, amountIn, isV3Path };
                         }
                     }
                 } catch(e) { return null; }
@@ -1129,9 +1038,15 @@
             if (bestOpportunity.profit > MIN_PROFIT_THRESHOLD) {
                 logMessage(`SUCCESS: New best opportunity found! Path: ${bestOpportunity.name} Profit: ${bestOpportunity.profit.toFixed(4)}%`, false);
                 currentOpportunity = bestOpportunity;
-                document.getElementById('executeTrade').disabled = false;
+                document.getElementById('analyzeTrade').disabled = false;
+                if (bestOpportunity.isV3Path) {
+                    logMessage("V3 path found. Manual execution required via a V3-compatible contract.", false, true);
+                    document.getElementById('executeTrade').disabled = true;
+                } else {
+                    document.getElementById('executeTrade').disabled = false;
+                }
+
                 if (stopOnFirst) return bestOpportunity;
-                
                 startAlert();
             } else if (!stopOnFirst) {
                 logMessage("Scan complete. No profitable opportunities found.", false, true);
@@ -1144,9 +1059,58 @@
             return null;
         }
 
+        async function analyzeOpportunity() {
+            if (!currentOpportunity) {
+                logMessage('No opportunity to analyze.', true);
+                return;
+            }
+            logMessage('Analyzing opportunity with Gemini AI...');
+            stopAlert();
+            const analysisContainer = document.getElementById('geminiAnalysisContainer');
+            const analysisResultDiv = document.getElementById('geminiAnalysisResult');
+            analysisContainer.style.display = 'block';
+            analysisResultDiv.innerHTML = '<div class="spinner"></div>';
+
+            const prompt = `You are a DeFi trading analyst. An arbitrage opportunity was found on the BNB Smart Chain. Here are the details:
+- Path: ${currentOpportunity.name}
+- Estimated Profit: ${currentOpportunity.profit.toFixed(4)}%
+- Flash Loan Amount: ${ethers.utils.formatEther(currentOpportunity.amountIn)} BNB
+
+Please provide a brief, one-paragraph risk and opportunity analysis for a human trader. Mention the volatility of the tokens involved (e.g., stablecoins vs. altcoins), the complexity of the path, and a general assessment of the risk level (e.g., Low, Medium, High). Keep the tone professional but easy to understand.`;
+            
+            try {
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = { contents: chatHistory };
+                const apiKey = ""; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    analysisResultDiv.textContent = text;
+                } else {
+                    throw new Error('Invalid response structure from Gemini API.');
+                }
+            } catch (error) {
+                console.error('Gemini API Error:', error);
+                analysisResultDiv.textContent = 'Could not retrieve analysis. Please try again.';
+                logMessage('Failed to get analysis from Gemini AI.', true);
+            }
+        }
+
+
         async function executeTrade(opportunityToExecute) {
             if (!opportunityToExecute) return logMessage("No opportunity provided to execute.", true);
+            if (opportunityToExecute.isV3Path) return logMessage("Cannot execute V3 path with this contract.", true);
             stopAlert();
+            document.getElementById('geminiAnalysisContainer').style.display = 'none';
             logMessage(`Preparing to execute: ${opportunityToExecute.name}`);
             const executeBtn = document.getElementById('executeTrade');
             executeBtn.disabled = true;
@@ -1155,23 +1119,6 @@
             try {
                 const gasPrice = await provider.getGasPrice();
                 document.getElementById('gasPriceDisplay').textContent = `${parseFloat(ethers.utils.formatUnits(gasPrice, 'gwei')).toFixed(2)} Gwei`;
-                
-                // Auto-approve logic
-                if (isAutoApproveEnabled) {
-                    const tokenContract = new ethers.Contract(opportunityToExecute.path[0], ERC20_ABI, provider);
-                    const userAddress = await signer.getAddress();
-                    const allowance = await tokenContract.allowance(userAddress, contract.address);
-                    
-                    if (allowance.lt(opportunityToExecute.amountIn)) {
-                        logMessage(`Insufficient token allowance. Auto-approving...`);
-                        const approvalSuccess = await setMaxApproval(opportunityToExecute.path[0], contract.address);
-                        if (!approvalSuccess) {
-                            throw new Error("Token approval failed");
-                        }
-                    } else {
-                        logMessage(`Sufficient token allowance already exists.`);
-                    }
-                }
                 
                 const estimatedGasLimit = await contract.estimateGas.executeArbitrage(opportunityToExecute.path[0], opportunityToExecute.amountIn, opportunityToExecute.path, opportunityToExecute.dexes);
                 const gasLimit = estimatedGasLimit.mul(120).div(100);
@@ -1220,8 +1167,6 @@
                 contract = new ethers.Contract(toChecksumAddress(RAW_CONTRACT_ADDRESS), CONTRACT_ABI, signer);
                 
                 document.getElementById('walletStatus').textContent = "Connected";
-                document.getElementById('walletSecurity').textContent = "Secure";
-                document.getElementById('walletSecurity').className = "security-badge security-high";
                 document.getElementById('connectWallet').style.display = 'none';
                 document.getElementById('scanAll').disabled = false;
                 document.getElementById('autoScanToggle').disabled = false;
@@ -1245,36 +1190,10 @@
             document.getElementById('scanProgress').style.width = `${progress}%`;
             document.getElementById('progressPercent').textContent = `${progress}%`;
         }
-        function copyContractAddress() {
-            navigator.clipboard.writeText(RAW_CONTRACT_ADDRESS);
-            logMessage("Contract address copied to clipboard!");
-        }
 
         // SIMULATED FUNCTIONS
-        async function runBacktest() {
-            logMessage("Running backtest with historical data (simulation)...");
-            const backtestResultsEl = document.getElementById('backtestResults');
-            backtestResultsEl.style.display = 'block';
-            backtestResultsEl.innerHTML = '<div class="spinner" style="display:block; margin: 10px auto;"></div>';
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            const simulatedResults = { opportunitiesFound: Math.floor(Math.random() * 50) + 10, avgProfit: (Math.random() * 5 + 2).toFixed(2), successRate: (Math.random() * 30 + 70).toFixed(1) };
-            backtestResultsEl.innerHTML = `<div class="sim-success"><div class="reserve-row"><span class="reserve-label">Opportunities Found:</span> <span class="reserve-value">${simulatedResults.opportunitiesFound}</span></div><div class="reserve-row"><span class="reserve-label">Average Profit:</span> <span class="reserve-value">${simulatedResults.avgProfit}%</span></div><div class="reserve-row"><span class="reserve-label">Est. Success Rate:</span> <span class="reserve-value">${simulatedResults.successRate}%</span></div></div>`;
-        }
-        async function compareDexPrices() {
-            logMessage(`Comparing prices across DEXs (simulation)...`);
-            const dexComparisonEl = document.getElementById('dexComparison');
-            dexComparisonEl.style.display = 'block';
-            dexComparisonEl.innerHTML = '<div class="spinner" style="display:block; margin: 10px auto;"></div>';
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            let priceHTML = '';
-            const prices = Object.keys(DEXS).map(dex => ({ name: dex, price: (300 + (Math.random() - 0.5) * 20) }));
-            prices.forEach(dex => { priceHTML += `<div class="dex-comparison-row"><div class="dex-name">${dex.name}:</div><div class="dex-price">${dex.price.toFixed(4)} USD</div></div>`; });
-            dexComparisonEl.innerHTML = priceHTML;
-        }
-        
-        // Initialize simulated buttons
-        document.getElementById('runBacktest').addEventListener('click', runBacktest);
-        document.getElementById('comparePrices').addEventListener('click', compareDexPrices);
+        async function runBacktest() { logMessage("Backtesting is a simulated feature."); }
+        async function compareDexPrices() { logMessage("DEX Comparison is a simulated feature."); }
     </script>
 </body>
 </html>
